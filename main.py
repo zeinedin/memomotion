@@ -17,6 +17,8 @@ import random
 
 app = FastAPI(title="Memory XXL Backend")
 
+
+
 # CORS
 app.add_middleware(
     CORSMiddleware,
@@ -25,6 +27,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.mount("/assets", StaticFiles(directory="static"), name="static")
+
 
 # ==================== STATE ====================
 class GameState:
@@ -63,6 +68,11 @@ async def root():
 @app.get('/')
 async def read_index():
     return FileResponse('static/index.html')
+
+@app.get("/app.js")
+async def read_js():
+    return FileResponse('static/app.js')
+
 @app.get("/api/stats")
 async def get_stats():
     """Get game statistics"""
@@ -399,7 +409,6 @@ async def startup():
     print(f"  Health check: http://YOUR_IP:8000/")
     print("\nWaiting for connections...\n")
     
-app.mount("/", StaticFiles(directory="static"), name="static")
 
 if __name__ == "__main__":
     import uvicorn
