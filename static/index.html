@@ -1,96 +1,189 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Memory XXL</title>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #111827; color: white; text-align: center; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; }
-        
-        /* SCHERMEN */
-        .screen { display: none; animation: fadeIn 0.5s; }
-        .screen.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        /* INPUTS */
-        .card { background: #1F2937; padding: 30px; border-radius: 15px; margin-top: 20px; }
-        input { padding: 15px; width: 80%; border-radius: 8px; border: none; font-size: 1.2rem; margin-bottom: 20px; }
-        
-        /* BUTTONS */
-        .btn { padding: 15px 30px; font-size: 1.2rem; border: none; border-radius: 8px; cursor: pointer; color: white; margin: 5px; transition: 0.2s; }
-        .btn-primary { background: linear-gradient(45deg, #EC4899, #8B5CF6); }
-        .btn-secondary { background: #374151; }
-        .btn:hover { transform: scale(1.05); }
-        
-        .lvl-btn { background: #374151; opacity: 0.6; }
-        .lvl-btn.selected { opacity: 1; background: #8B5CF6; border: 2px solid white; }
-
-        /* GAME GRID (Geen nummers!) */
-        .grid { display: flex; justify-content: center; gap: 15px; margin-top: 30px; flex-wrap: wrap; }
-        .tile {
-            width: 80px; height: 80px;
-            background: #374151;
-            border-radius: 12px;
-            border: 3px solid #4B5563;
-            /* Verberg Nummers */
-            font-size: 0; 
-            color: transparent;
-            transition: 0.2s;
-        }
-        .tile.highlight { background: #EC4899; box-shadow: 0 0 20px #EC4899; transform: scale(1.1); }
-        .tile.correct { background: #10B981; }
-        .tile.wrong { background: #EF4444; }
-
-        /* LEADERBOARD */
-        table { width: 100%; text-align: left; border-collapse: collapse; }
-        th, td { padding: 10px; border-bottom: 1px solid #374151; }
-        th { color: #9CA3AF; }
-        tr:first-child td { color: #FCD34D; font-weight: bold; }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
+    <!-- START SCREEN -->
+    <div id="startScreen" class="screen active">
+        <div class="container">
+            <header>
+                <h1 class="title">MEMORY XXL</h1>
+                <p class="subtitle">Test je geheugen!</p>
+            </header>
 
-<div class="container">
-    <h1>MEMORY XXL</h1>
+            <div class="registration-card">
+                <h2>Team Registratie</h2>
 
-    <div id="screen-start" class="screen active">
-        <div class="card">
-            <h2>Join Game</h2>
-            <input type="text" id="teamName" placeholder="Team Name">
-            
-            <div style="margin-bottom: 20px;">
-                <button class="btn lvl-btn" onclick="selectLevel('Easy', this)">Easy</button>
-                <button class="btn lvl-btn selected" onclick="selectLevel('Normal', this)">Normal</button>
-                <button class="btn lvl-btn" onclick="selectLevel('Hard', this)">Hard</button>
+                <div class="form-group">
+                    <label for="teamName">Team Naam</label>
+                    <input type="text" id="teamName" placeholder="Voer je teamnaam in..." maxlength="20">
+                </div>
+
+                <div class="form-group">
+                    <label>Kies Niveau</label>
+                    <div class="level-selector">
+                        <button class="level-btn active" data-level="easy">
+                            <span class="level-icon">🌱</span>
+                            <span class="level-name">Easy</span>
+                            <span class="level-desc">4 tegels</span>
+                        </button>
+                        <button class="level-btn" data-level="medium">
+                            <span class="level-icon">🔥</span>
+                            <span class="level-name">Medium</span>
+                            <span class="level-desc">6 tegels</span>
+                        </button>
+                        <button class="level-btn" data-level="hard">
+                            <span class="level-icon">💀</span>
+                            <span class="level-name">Hard</span>
+                            <span class="level-desc">8 tegels</span>
+                        </button>
+                    </div>
+                </div>
+
+                <button id="startGameBtn" class="btn btn-primary btn-large">
+                    START SPEL
+                </button>
             </div>
 
-            <button class="btn btn-primary" onclick="registerTeam()">START GAME</button>
-            <br><br>
-            <button class="btn btn-secondary" onclick="loadLeaderboard()">🏆 Leaderboard</button>
+            <div class="leaderboard-preview">
+                <h3>🏆 Top 5 Teams</h3>
+                <div id="leaderboardPreview" class="leaderboard-list">
+                    <div class="loading">Laden...</div>
+                </div>
+                <button id="viewLeaderboardBtn" class="btn btn-secondary">
+                    Bekijk Volledig Leaderboard
+                </button>
+            </div>
         </div>
     </div>
 
-    <div id="screen-game" class="screen">
-        <h3>Team: <span id="displayTeam"></span></h3>
-        <h2 id="gameMessage">Wait for pattern...</h2>
-        <div id="gameGrid" class="grid"></div>
-        <br>
-        <button class="btn btn-secondary" onclick="showScreen('screen-start')">Quit</button>
-    </div>
+    <!-- GAME SCREEN -->
+    <div id="gameScreen" class="screen">
+        <div class="container">
+            <header class="game-header">
+                <div class="team-info">
+                    <span class="team-name" id="currentTeamName">Team</span>
+                    <span class="team-level" id="currentLevel">Easy</span>
+                </div>
+                <button id="backToStartBtn" class="btn btn-small btn-secondary">← Terug</button>
+            </header>
 
-    <div id="screen-leaderboard" class="screen">
-        <div class="card">
-            <h2>Top Scores</h2>
-            <table id="lbTable">
-                <thead><tr><th>#</th><th>Team</th><th>Score</th></tr></thead>
-                <tbody></tbody>
-            </table>
-            <button class="btn btn-secondary" onclick="showScreen('screen-start')">Back</button>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="currentScore">0</div>
+                    <div class="stat-label">Score</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="roundNumber">0</div>
+                    <div class="stat-label">Ronde</div>
+                </div>
+            </div>
+
+            <div class="status-card">
+                <div class="status-item">
+                    <span class="status-dot" id="masterDot"></span>
+                    <span id="masterStatus">Master: Verbinden...</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-dot" id="tilesDot"></span>
+                    <span id="tilesStatus">Tegels: 0/0</span>
+                </div>
+            </div>
+
+            <div class="game-message" id="gameMessage">
+                <div class="message-text" id="messageText">Druk op START knop om te beginnen!</div>
+            </div>
+
+            <!-- PATTERN DISPLAY - Visual Grid -->
+            <div class="pattern-section" id="patternSection">
+                <h3 class="section-title" id="patternTitle">Het Patroon</h3>
+                <div class="tile-grid" id="tileGrid">
+                    <!-- 4x4 grid of tiles -->
+                    <div class="tile-box" data-tile="1"></div>
+                    <div class="tile-box" data-tile="2"></div>
+                    <div class="tile-box" data-tile="3"></div>
+                    <div class="tile-box" data-tile="4"></div>
+                    <div class="tile-box" data-tile="5"></div>
+                    <div class="tile-box" data-tile="6"></div>
+                    <div class="tile-box" data-tile="7"></div>
+                    <div class="tile-box" data-tile="8"></div>
+                    <div class="tile-box" data-tile="9"></div>
+                    <div class="tile-box" data-tile="10"></div>
+                    <div class="tile-box" data-tile="11"></div>
+                    <div class="tile-box" data-tile="12"></div>
+                    <div class="tile-box" data-tile="13"></div>
+                    <div class="tile-box" data-tile="14"></div>
+                    <div class="tile-box" data-tile="15"></div>
+                    <div class="tile-box" data-tile="16"></div>
+                </div>
+            </div>
+
+            <!-- PATTERN SEQUENCE (visual boxes showing order) -->
+            <div class="sequence-section" id="sequenceSection">
+                <h3 class="section-title">Patroon Volgorde</h3>
+                <div class="sequence-grid" id="sequenceGrid"></div>
+            </div>
+
+            <!-- PLAYER STEPS -->
+            <div class="steps-section" id="stepsSection">
+                <h3 class="section-title">Jouw Stappen</h3>
+                <div class="sequence-grid" id="stepsGrid"></div>
+            </div>
         </div>
     </div>
-</div>
 
-<script src="app.js"></script>
+    <!-- LEADERBOARD SCREEN -->
+    <div id="leaderboardScreen" class="screen">
+        <div class="container">
+            <header>
+                <h1 class="title">🏆 LEADERBOARD</h1>
+                <p class="subtitle">De beste teams</p>
+            </header>
+
+            <div class="leaderboard-full" id="leaderboardFull">
+                <div class="loading">Laden...</div>
+            </div>
+
+            <button id="backFromLeaderboardBtn" class="btn btn-primary">
+                ← Terug naar Start
+            </button>
+        </div>
+    </div>
+
+    <!-- GAME OVER SCREEN -->
+    <div id="gameOverScreen" class="screen">
+        <div class="container">
+            <div class="game-over-card">
+                <h1 id="gameOverTitle">Spel Voorbij!</h1>
+                <div class="final-score">
+                    <span class="score-label">Eindscore</span>
+                    <span class="score-value" id="finalScore">0</span>
+                </div>
+                <div class="game-over-stats">
+                    <div class="stat">
+                        <span class="stat-label">Rondes</span>
+                        <span class="stat-value" id="finalRounds">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Niveau</span>
+                        <span class="stat-value" id="finalLevel">Easy</span>
+                    </div>
+                </div>
+                <div class="game-over-actions">
+                    <button id="playAgainBtn" class="btn btn-primary">Opnieuw Spelen</button>
+                    <button id="backToMenuBtn" class="btn btn-secondary">Terug naar Menu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
 </body>
+
 </html>
