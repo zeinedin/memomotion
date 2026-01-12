@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -153,8 +154,15 @@
         }
 
         @keyframes pulse {
-            0%, 100% { transform: scale(1.1); }
-            50% { transform: scale(1.2); }
+
+            0%,
+            100% {
+                transform: scale(1.1);
+            }
+
+            50% {
+                transform: scale(1.2);
+            }
         }
 
         /* Player Steps */
@@ -216,6 +224,7 @@
                 transform: translateY(-20px);
                 opacity: 0;
             }
+
             to {
                 transform: translateY(0);
                 opacity: 1;
@@ -260,6 +269,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <header>
@@ -320,8 +330,9 @@
     </div>
 
     <script>
-        const WS_HOST = window.location.hostname || 'localhost';
-        const WS_URL = `ws://${WS_HOST}:8000/ws/frontend`;
+        const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        const WS_HOST = window.location.host;;
+        const WS_URL = `${protocol}${host}/ws/frontend`;
 
         let ws = null;
         let state = {
@@ -404,7 +415,7 @@
         function showPattern(pattern) {
             state.pattern = pattern;
             state.playerSteps = [];
-            
+
             const grid = document.getElementById('patternGrid');
             grid.innerHTML = '';
 
@@ -458,7 +469,7 @@
         function showMessage(text, type = '') {
             const msg = document.getElementById('message');
             const msgText = document.getElementById('messageText');
-            
+
             msgText.textContent = text;
             msg.className = `message show ${type}`;
 
@@ -473,7 +484,7 @@
             state.pattern = [];
             state.playerSteps = [];
             state.gamePhase = 'idle';
-            
+
             document.getElementById('patternSection').classList.remove('show');
             document.getElementById('stepsSection').classList.remove('show');
             document.getElementById('stepsGrid').innerHTML = '';
@@ -483,7 +494,7 @@
         function updateMasterStatus(connected) {
             const dot = document.getElementById('masterDot');
             const status = document.getElementById('masterStatus');
-            
+
             if (connected) {
                 dot.classList.add('connected');
                 status.textContent = 'Master: Connected';
@@ -496,9 +507,9 @@
         function updateTileStatus(data) {
             const dot = document.getElementById('tilesDot');
             const status = document.getElementById('tilesStatus');
-            
+
             status.textContent = `Tiles: ${data.connected}/${data.total}`;
-            
+
             if (data.connected > 0) {
                 dot.classList.add('connected');
             } else {
@@ -526,4 +537,5 @@
         connect();
     </script>
 </body>
+
 </html>
