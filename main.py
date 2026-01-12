@@ -343,6 +343,21 @@ async def handle_master_message(msg: dict):
     elif event == "player_step":
         await handle_player_step(data)
     
+    elif event == "tile_touched" or event == "tile_pressed":
+        # Tile was touched/pressed - always forward to frontend for visual feedback
+        tile_id = data.get("tile_id")
+        print(f"  Tile {tile_id} touched!")
+        await broadcast_to_frontends({
+            "event": "tile_pressed",
+            "data": {
+                "tile_id": tile_id,
+                "timestamp": data.get("timestamp", 0)
+            }
+        })
+        # If game is in progress, also handle as player step
+        if state.game_phase == "memorizing":
+            await handle_player_step(data)
+    
     elif event == "pattern_shown":
         print("✓ Pattern displayed on tiles")
         # Pattern is now showing - tell frontend

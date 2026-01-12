@@ -217,12 +217,10 @@ function connectWebSocket() {
     socket = new WebSocket(wsUrl);
 
     socket.onopen = () => {
-      console.log('🔌 WebSocket connected');
+      console.log('🔌 WebSocket connected!');
       reconnectAttempts = 0;
       updateConnectionStatus(true);
-
-      // Request initial status
-      sendMessage({ type: 'get_status' });
+      // Backend sends initial_state automatically on connect
     };
 
     socket.onclose = () => {
@@ -279,15 +277,27 @@ function handleWebSocketMessage(message) {
   const msgType = message.type || message.event;
   const msgData = message.data || message;
 
+  console.log('📩 Message type:', msgType, 'Data:', msgData);
+
   switch (msgType) {
     case 'initial_state':
-      // Initial connection - update master status
-      gameState.masterConnected = msgData.master_connected;
-      updateMasterStatus();
+    case 'state_update':
+      // Initial connection or state update - update master status
       console.log(
-        '✓ Initial state received, master:',
+        '✓ State received, master_connected:',
         msgData.master_connected
       );
+      if (msgData.master_connected !== undefined) {
+        gameState.masterConnected = msgData.master_connected;
+        updateMasterStatus();
+      }
+      if (msgData.tiles) {
+        const tileIds = Object.keys(msgData.tiles).map(Number);
+        const connectedTiles = tileIds.filter(
+          (id) => msgData.tiles[id]?.connected
+        );
+        updateTileStatus(connectedTiles, tileIds.length);
+      }
       break;
     case 'status':
       handleStatusUpdate(msgData);
@@ -366,8 +376,52 @@ function handleWebSocketMessage(message) {
       updateMasterStatus();
       console.log('✗ Master disconnected');
       break;
+    case 'memorizing_phase':
+      // Pattern is being shown - player should memorize
+      setMessage('🧠', msgData.message || 'Memorize the pattern!');
+      if (msgData.pattern) {
+        showPattern(msgData.pattern);
+      }
+      break;
+    case 'pattern_wrong':
+      // Player made a mistake
+      setMessage('❌', msgData.message || 'Wrong! Game Over!');
+      handleGameOver(
+        msgData.score || gameState.score,
+        msgData.round || gameState.round
+      );
+      break;
+    case 'game_ended':
+      // Game has ended
+      handleGameOver(
+        msgData.score || gameState.score,
+        msgData.rounds || gameState.round
+      );
+      break;
+    case 'player_input_phase':
+      // Player's turn to repeat the pattern
+      startPlayerTurn(
+        msgData.expected_count || LEVEL_CONFIG[gameState.level].steps
+      );
+      break;
+    case 'tile_pressed':
+    case 'player_stepped':
+      // A tile was pressed by the player
+      console.log('🎯 Tile pressed:', msgData.tile_id);
+      handleTileActivated(msgData.tile_id || message.tile_id);
+      // Update step count if available
+      if (msgData.step_number) {
+        setMessage(
+          '👆',
+          `Step ${msgData.step_number} - Tile ${msgData.tile_id}`
+        );
+      }
+      break;
     default:
-      console.log('Unknown message type:', msgType, message);
+      // Reduce console spam - only log truly unknown types
+      if (!['tile_status'].includes(msgType)) {
+        console.log('Unknown message type:', msgType);
+      }
   }
 }
 
@@ -397,20 +451,28 @@ function handleStatusUpdate(data) {
 }
 
 function updateConnectionStatus(connected) {
-  if (!connected) {
+  if (connected) {
+    // WebSocket connected - waiting for hardware
+    elements.masterStatus.textContent = 'Master: Waiting for hardware...';
+    console.log('✓ WebSocket connected, waiting for master ESP32');
+  } else {
     elements.masterDot.classList.remove('connected');
-    elements.masterStatus.textContent = 'Master: Disconnected';
+    elements.masterStatus.textContent = 'Server: Disconnected';
     elements.tilesDot.classList.remove('connected');
   }
 }
 
 function updateMasterStatus() {
+  console.log('🔄 updateMasterStatus:', gameState.masterConnected);
+
   if (gameState.masterConnected) {
     elements.masterDot.classList.add('connected');
-    elements.masterStatus.textContent = 'Master: Connected';
+    elements.masterStatus.textContent = 'Master: Connected ✓';
+    console.log('✅ Master status updated to CONNECTED');
   } else {
     elements.masterDot.classList.remove('connected');
     elements.masterStatus.textContent = 'Master: Waiting...';
+    console.log('⏳ Master status updated to WAITING');
   }
 }
 
@@ -419,6 +481,8 @@ function updateMasterStatus() {
 // ============================================
 
 function updateTileStatus(connectedTiles, expectedTiles) {
+  console.log('🎯 updateTileStatus called:', { connectedTiles, expectedTiles });
+
   gameState.connectedTiles = connectedTiles || [];
   gameState.expectedTiles = expectedTiles || gameState.connectedTiles.length;
 
@@ -426,6 +490,7 @@ function updateTileStatus(connectedTiles, expectedTiles) {
   const connected = gameState.connectedTiles.length;
   const expected = Math.max(gameState.expectedTiles, connected);
 
+  console.log(`🎯 Tiles: ${connected}/${expected}`);
   elements.tilesStatus.textContent = `Tiles: ${connected}/${expected}`;
 
   if (connected > 0 && connected >= expected) {
@@ -438,6 +503,14 @@ function updateTileStatus(connectedTiles, expectedTiles) {
 
   // Rebuild the tile grid dynamically
   buildTileGrid();
+
+  // Update message based on status
+  if (gameState.masterConnected && connected > 0) {
+    setMessage(
+      '🎮',
+      `${connected} tiles ready! Press START on the master to begin!`
+    );
+  }
 }
 
 function buildTileGrid() {
@@ -493,12 +566,21 @@ function handleTileDisconnected(tileId) {
 }
 
 function handleTileActivated(tileId) {
+  console.log('🎯 handleTileActivated:', tileId);
   const tile = document.getElementById(`tile-${tileId}`);
   if (tile) {
+    // Add visual feedback
     tile.classList.add('active');
+    tile.classList.add('pressed');
+
+    // Remove after animation
     setTimeout(() => {
       tile.classList.remove('active');
+      tile.classList.remove('pressed');
     }, 500);
+  } else {
+    console.warn(`⚠️ Tile element not found: tile-${tileId}`);
+    console.log('Available tiles:', gameState.connectedTiles);
   }
 }
 
@@ -560,6 +642,12 @@ function startGame() {
 }
 
 function getModeStartMessage() {
+  if (!gameState.masterConnected) {
+    return 'Waiting for Master ESP32 to connect...';
+  }
+  if (gameState.connectedTiles.length === 0) {
+    return 'Waiting for tiles to connect...';
+  }
   switch (gameState.mode) {
     case 'speedrun':
       return 'Speed Run! Complete patterns before time runs out!';
@@ -568,7 +656,7 @@ function getModeStartMessage() {
     case 'simon':
       return 'Simon Says! Watch and repeat the sequence!';
     default:
-      return 'Connecting to game master...';
+      return 'Ready! Press START on the master to begin!';
   }
 }
 
@@ -896,12 +984,17 @@ function handleGameOver(finalScore, rounds) {
 async function loadLeaderboard() {
   try {
     const response = await fetch('/api/leaderboard?limit=5');
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
     const data = await response.json();
     renderLeaderboard(elements.leaderboardPreview, data, true);
   } catch (error) {
-    console.error('Failed to load leaderboard:', error);
-    elements.leaderboardPreview.innerHTML =
-      '<p class="empty-leaderboard">Unable to load leaderboard</p>';
+    console.error('Failed to load leaderboard:', error.message);
+    if (elements.leaderboardPreview) {
+      elements.leaderboardPreview.innerHTML =
+        '<p class="empty-leaderboard">Unable to load leaderboard</p>';
+    }
   }
 }
 
