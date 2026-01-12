@@ -1,333 +1,207 @@
-/**
- * Memory XXL Frontend - Testing Version
- * January 9, 2025
- */
+// CONFIGURATIE (Direct naar Azure)
+const wsUrl = "wss://memo-motion.azurewebsites.net/ws/frontend";
 
-const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+console.log("Connecting to:", wsUrl);
 
-const host = window.location.host;
-
-// Configuration
-const WS_URL = `${protocol}${host}/ws/frontend`;
-
-console.log('Connecting to WebSocket:', WS_URL);
-
-// State
-const state = {
-  ws: null,
-  connected: false,
-  masterConnected: false,
-  tiles: {},
-  gameActive: false,
-  gamesPlayed: 0,
-  highScore: 0,
-  currentScore: 0,
-  patternLength: 0,
-  progress: 0,
+let ws = null;
+let state = {
+    pattern: [],
+    playerSteps: [],
+    gamePhase: 'idle'
 };
 
-// DOM Elements
-const elements = {
-  masterStatus: document.getElementById('masterStatus'),
-  masterDot: document.getElementById('masterDot'),
-  tilesStatus: document.getElementById('tilesStatus'),
-  tilesDot: document.getElementById('tilesDot'),
-  startBtn: document.getElementById('startBtn'),
-  testBtn: document.getElementById('testBtn'),
-  gamesPlayed: document.getElementById('gamesPlayed'),
-  highScore: document.getElementById('highScore'),
-  currentScore: document.getElementById('currentScore'),
-  currentScoreCard: document.getElementById('currentScoreCard'),
-  gameMessage: document.getElementById('gameMessage'),
-  messageText: document.getElementById('messageText'),
-  progressContainer: document.getElementById('progressContainer'),
-  progressFill: document.getElementById('progressFill'),
-  progressText: document.getElementById('progressText'),
-  progressNumbers: document.getElementById('progressNumbers'),
-  debugInfo: document.getElementById('debugInfo'),
-  debugContent: document.getElementById('debugContent'),
-};
+// Connect WebSocket
+function connect() {
+    // Let op: we gebruiken hier de variabele wsUrl (kleine letters)
+    ws = new WebSocket(wsUrl);
 
-// ==================== WEBSOCKET ====================
-function connectWebSocket() {
-  console.log(`Connecting to ${WS_URL}...`);
+    ws.onopen = () => {
+        console.log('✓ Connected');
+    };
 
-  state.ws = new WebSocket(WS_URL);
+    ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        handleMessage(msg);
+    };
 
-  state.ws.onopen = () => {
-    console.log('✓ WebSocket connected');
-    state.connected = true;
-    updateDebug();
-  };
-
-  state.ws.onmessage = (event) => {
-    const msg = JSON.parse(event.data);
-    handleMessage(msg);
-  };
-
-  state.ws.onerror = (error) => {
-    console.error('WebSocket error:', error);
-  };
-
-  state.ws.onclose = () => {
-    console.log('✗ WebSocket disconnected');
-    state.connected = false;
-    state.masterConnected = false;
-    updateUI();
-
-    // Reconnect after 3 seconds
-    setTimeout(connectWebSocket, 3000);
-  };
+    ws.onclose = () => {
+        console.log('✗ Disconnected');
+        setTimeout(connect, 3000);
+    };
 }
 
-// ==================== MESSAGE HANDLING ====================
 function handleMessage(msg) {
-  console.log('←', msg.event, msg.data);
+    console.log('←', msg.event);
 
-  switch (msg.event) {
-    case 'initial_state':
-      handleInitialState(msg.data);
-      break;
-    case 'master_status':
-      handleMasterStatus(msg.data);
-      break;
-    case 'tile_status':
-      handleTileStatus(msg.data);
-      break;
-    case 'game_started':
-      handleGameStarted(msg.data);
-      break;
-    case 'pattern_complete':
-      showMessage(msg.data.message, 'info');
-      break;
-    case 'player_turn':
-      handlePlayerTurn(msg.data);
-      break;
-    case 'step_correct':
-      handleStepCorrect(msg.data);
-      break;
-    case 'step_incorrect':
-      handleStepIncorrect(msg.data);
-      break;
-    case 'round_complete':
-      handleRoundComplete(msg.data);
-      break;
-    case 'game_ended':
-      handleGameEnded(msg.data);
-      break;
-    case 'error':
-      showMessage(msg.data.message, 'error');
-      break;
-  }
+    switch (msg.event) {
+        case 'initial_state':
+            updateStatus(msg.data);
+            break;
 
-  updateDebug();
+        case 'master_status':
+            updateMasterStatus(msg.data.connected);
+            break;
+
+        case 'tile_status':
+            updateTileStatus(msg.data);
+            break;
+
+        case 'game_started':
+            showPattern(msg.data.pattern);
+            showMessage(msg.data.message);
+            break;
+
+        case 'pattern_displayed':
+            state.pattern = msg.data.pattern;
+            showMessage(msg.data.message);
+            break;
+
+        case 'memorizing_phase':
+            state.gamePhase = 'memorizing';
+            state.playerSteps = [];
+            document.getElementById('stepsSection').classList.add('show');
+            showMessage(msg.data.message);
+            break;
+
+        case 'player_stepped':
+            addPlayerStep(msg.data.tile_id);
+            break;
+
+        case 'pattern_correct':
+            showResult(true, msg.data);
+            break;
+
+        case 'pattern_wrong':
+            showResult(false, msg.data);
+            break;
+
+        case 'game_ended':
+            updateStats(msg.data);
+            setTimeout(reset, 3000);
+            break;
+    }
 }
 
-function handleInitialState(data) {
-  state.masterConnected = data.master_connected;
-  state.tiles = data.tiles || {};
-  state.gameActive = data.game_active;
-  state.gamesPlayed = data.games_played;
-  state.highScore = data.high_score;
-  updateUI();
+function showPattern(pattern) {
+    state.pattern = pattern;
+    state.playerSteps = [];
+
+    const grid = document.getElementById('patternGrid');
+    grid.innerHTML = '';
+
+    pattern.forEach((tileId, index) => {
+        const tile = document.createElement('div');
+        tile.className = 'pattern-tile';
+        tile.textContent = tileId;
+        tile.style.animationDelay = `${index * 0.1}s`;
+        grid.appendChild(tile);
+    });
+
+    document.getElementById('patternSection').classList.add('show');
+    document.getElementById('stepsSection').classList.remove('show');
 }
 
-function handleMasterStatus(data) {
-  state.masterConnected = data.connected;
-  updateUI();
+function addPlayerStep(tileId) {
+    state.playerSteps.push(tileId);
+
+    const stepsGrid = document.getElementById('stepsGrid');
+    const step = document.createElement('div');
+    step.className = 'step-indicator';
+    step.textContent = tileId;
+    stepsGrid.appendChild(step);
 }
 
-function handleTileStatus(data) {
-  state.tiles = data.tiles || {};
-  updateUI();
+function showResult(correct, data) {
+    const patternGrid = document.getElementById('patternGrid');
+    const tiles = patternGrid.children;
+
+    if (correct) {
+        // Highlight all as correct
+        for (let tile of tiles) {
+            tile.classList.add('correct');
+        }
+        showMessage('🎉 Perfect! You got it right!', 'success');
+    } else {
+        // Show which were wrong
+        data.player_steps.forEach((stepId, index) => {
+            if (tiles[index]) {
+                if (stepId === data.expected[index]) {
+                    tiles[index].classList.add('correct');
+                } else {
+                    tiles[index].classList.add('wrong');
+                }
+            }
+        });
+        showMessage('Oops! Try again!', 'error');
+    }
 }
 
-function handleGameStarted(data) {
-  state.gameActive = true;
-  state.currentScore = 0;
-  state.patternLength = data.pattern_length;
-  state.progress = 0;
+function showMessage(text, type = '') {
+    const msg = document.getElementById('message');
+    const msgText = document.getElementById('messageText');
 
-  showMessage(data.message, 'info');
-  elements.currentScoreCard.classList.remove('hidden');
-  elements.progressContainer.classList.remove('hidden');
-  elements.startBtn.disabled = true;
+    msgText.textContent = text;
+    msg.className = `message show ${type}`;
 
-  updateScore();
-  updateProgress();
+    if (type) {
+        setTimeout(() => {
+            msg.classList.remove('show');
+        }, 3000);
+    }
 }
 
-function handlePlayerTurn(data) {
-  state.patternLength = data.pattern_length;
-  showMessage(data.message, 'success');
-  updateProgress();
+function reset() {
+    state.pattern = [];
+    state.playerSteps = [];
+    state.gamePhase = 'idle';
+
+    document.getElementById('patternSection').classList.remove('show');
+    document.getElementById('stepsSection').classList.remove('show');
+    document.getElementById('stepsGrid').innerHTML = '';
+    document.getElementById('message').classList.remove('show');
 }
 
-function handleStepCorrect(data) {
-  state.progress = data.progress;
-  state.currentScore = data.score;
+function updateMasterStatus(connected) {
+    const dot = document.getElementById('masterDot');
+    const status = document.getElementById('masterStatus');
 
-  // Flash success
-  elements.currentScoreCard.classList.add('success');
-  setTimeout(() => {
-    elements.currentScoreCard.classList.remove('success');
-  }, 300);
-
-  updateScore();
-  updateProgress();
+    if (connected) {
+        dot.classList.add('connected');
+        status.textContent = 'Master: Connected';
+    } else {
+        dot.classList.remove('connected');
+        status.textContent = 'Master: Disconnected';
+    }
 }
 
-function handleStepIncorrect(data) {
-  state.currentScore = data.score;
+function updateTileStatus(data) {
+    const dot = document.getElementById('tilesDot');
+    const status = document.getElementById('tilesStatus');
 
-  // Flash error
-  elements.currentScoreCard.classList.add('error');
-  setTimeout(() => {
-    elements.currentScoreCard.classList.remove('error');
-  }, 500);
+    status.textContent = `Tiles: ${data.connected}/${data.total}`;
 
-  showMessage(`Wrong tile! Expected tile ${data.expected}`, 'error');
-  updateScore();
+    if (data.connected > 0) {
+        dot.classList.add('connected');
+    } else {
+        dot.classList.remove('connected');
+    }
 }
 
-function handleRoundComplete(data) {
-  state.currentScore = data.score;
-  showMessage(data.message, 'success');
-  updateScore();
+function updateStats(data) {
+    document.getElementById('gamesPlayed').textContent = data.games_played;
+    document.getElementById('highScore').textContent = data.high_score;
 }
 
-function handleGameEnded(data) {
-  state.gameActive = false;
-  state.gamesPlayed = data.games_played;
-  state.highScore = data.high_score;
-
-  showMessage(`Game Over! Final Score: ${data.score}`, 'info');
-
-  setTimeout(() => {
-    elements.currentScoreCard.classList.add('hidden');
-    elements.progressContainer.classList.add('hidden');
-    elements.startBtn.disabled = false;
-  }, 3000);
-
-  updateUI();
+function updateStatus(data) {
+    updateMasterStatus(data.master_connected);
+    if (data.tiles) {
+        updateTileStatus({
+            total: Object.keys(data.tiles).length,
+            connected: Object.values(data.tiles).filter(t => t.connected).length
+        });
+    }
+    updateStats(data);
 }
 
-// ==================== UI UPDATES ====================
-function updateUI() {
-  // Master status
-  if (state.masterConnected) {
-    elements.masterStatus.textContent = 'Master: Connected';
-    elements.masterDot.classList.add('connected');
-    elements.masterDot.classList.remove('disconnected');
-  } else {
-    elements.masterStatus.textContent = 'Master: Disconnected';
-    elements.masterDot.classList.remove('connected');
-    elements.masterDot.classList.add('disconnected');
-  }
-
-  // Tiles status
-  const tileIds = Object.keys(state.tiles);
-  const connected = tileIds.filter((id) => state.tiles[id].connected).length;
-  elements.tilesStatus.textContent = `Tiles: ${connected}/${tileIds.length}`;
-
-  if (connected > 0) {
-    elements.tilesDot.classList.add('connected');
-    elements.tilesDot.classList.remove('disconnected');
-  } else {
-    elements.tilesDot.classList.remove('connected');
-    elements.tilesDot.classList.add('disconnected');
-  }
-
-  // Stats
-  elements.gamesPlayed.textContent = state.gamesPlayed;
-  elements.highScore.textContent = state.highScore;
-
-  // Start button
-  const canStart = state.masterConnected && connected >= 2 && !state.gameActive;
-  elements.startBtn.disabled = !canStart;
-}
-
-function updateScore() {
-  elements.currentScore.textContent = state.currentScore;
-}
-
-function updateProgress() {
-  const percent = (state.progress / state.patternLength) * 100;
-  elements.progressFill.style.width = `${percent}%`;
-  elements.progressNumbers.textContent = `${state.progress}/${state.patternLength}`;
-}
-
-function showMessage(text, type = 'info') {
-  elements.messageText.textContent = text;
-  elements.gameMessage.classList.remove('hidden');
-
-  // Auto-hide after 3 seconds for non-error messages
-  if (type !== 'error') {
-    setTimeout(() => {
-      elements.gameMessage.classList.add('hidden');
-    }, 3000);
-  }
-}
-
-function updateDebug() {
-  if (!elements.debugInfo.classList.contains('hidden')) {
-    elements.debugContent.innerHTML = `
-            <strong>Connection:</strong> ${state.connected ? '✓' : '✗'}<br>
-            <strong>Master:</strong> ${state.masterConnected ? '✓' : '✗'}<br>
-            <strong>Tiles:</strong> ${JSON.stringify(state.tiles)}<br>
-            <strong>Game Active:</strong> ${state.gameActive}<br>
-            <strong>Score:</strong> ${state.currentScore}<br>
-            <strong>Progress:</strong> ${state.progress}/${state.patternLength}
-        `;
-  }
-}
-
-// ==================== BUTTON HANDLERS ====================
-elements.startBtn.addEventListener('click', () => {
-  if (!state.ws || !state.masterConnected) {
-    alert('Not connected to backend or master!');
-    return;
-  }
-
-  console.log('→ Starting game...');
-  state.ws.send(
-    JSON.stringify({
-      event: 'start_game',
-      data: {},
-    })
-  );
-});
-
-elements.testBtn.addEventListener('click', () => {
-  if (!state.ws) {
-    alert('Not connected to backend!');
-    return;
-  }
-
-  console.log('→ Test button pressed');
-  showMessage('Testing tiles...', 'info');
-
-  // Request current state
-  state.ws.send(
-    JSON.stringify({
-      event: 'request_state',
-      data: {},
-    })
-  );
-});
-
-// Debug toggle (press 'd' key)
-document.addEventListener('keypress', (e) => {
-  if (e.key === 'd' || e.key === 'D') {
-    elements.debugInfo.classList.toggle('hidden');
-    updateDebug();
-  }
-});
-
-// ==================== INITIALIZATION ====================
-console.log('Memory XXL Frontend - Testing Version');
-console.log('January 9, 2025');
-connectWebSocket();
-
-// Initial UI update
-updateUI();
+// Start connection
+connect();
