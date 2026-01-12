@@ -331,8 +331,10 @@
 
     <script>
         const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-        const WS_HOST = window.location.host;
-        const WS_URL = `${protocol}${host}/ws/frontend`;
+        const host = window.location.host; // Pakt automatisch de juiste poort
+        const wsUrl = `${protocol}${host}/ws/frontend`;
+
+        console.log("Connecting to:", wsUrl);
 
         let ws = null;
         let state = {
