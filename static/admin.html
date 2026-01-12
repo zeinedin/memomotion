@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="nl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory XXL - Admin Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        /* Admin specific styles */
+        .admin-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: var(--space-lg);
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-xl);
+        }
+
+        .admin-title {
+            font-family: var(--font-display);
+            font-size: 2rem;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .admin-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: var(--space-lg);
+        }
+
+        .admin-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius-lg);
+            padding: var(--space-xl);
+            backdrop-filter: blur(20px);
+        }
+
+        .admin-card h3 {
+            font-family: var(--font-display);
+            font-size: 1.1rem;
+            margin-bottom: var(--space-lg);
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--space-md);
+        }
+
+        .status-item {
+            background: rgba(0, 0, 0, 0.3);
+            padding: var(--space-md);
+            border-radius: var(--radius-sm);
+            text-align: center;
+        }
+
+        .status-value {
+            font-family: var(--font-display);
+            font-size: 2rem;
+            font-weight: 700;
+            display: block;
+        }
+
+        .status-value.online {
+            color: var(--neon-green);
+        }
+
+        .status-value.offline {
+            color: var(--neon-red);
+        }
+
+        .status-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .config-form {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-md);
+        }
+
+        .config-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: var(--space-sm) 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .config-row:last-child {
+            border-bottom: none;
+        }
+
+        .config-label {
+            font-weight: 500;
+        }
+
+        .config-input {
+            width: 80px;
+            padding: var(--space-sm);
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-family: var(--font-display);
+            font-size: 1rem;
+            text-align: center;
+        }
+
+        .config-input:focus {
+            outline: none;
+            border-color: var(--neon-cyan);
+        }
+
+        .leaderboard-actions {
+            display: flex;
+            gap: var(--space-md);
+            margin-bottom: var(--space-lg);
+        }
+
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .leaderboard-table th,
+        .leaderboard-table td {
+            padding: var(--space-sm) var(--space-md);
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .leaderboard-table th {
+            font-family: var(--font-display);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .leaderboard-table tr:hover td {
+            background: rgba(0, 245, 255, 0.1);
+        }
+
+        .delete-btn {
+            background: rgba(255, 0, 68, 0.2);
+            border: 1px solid var(--neon-red);
+            color: var(--neon-red);
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .delete-btn:hover {
+            background: rgba(255, 0, 68, 0.4);
+        }
+
+        .btn-danger {
+            background: var(--gradient-danger);
+            color: white;
+        }
+
+        .btn-success {
+            background: var(--gradient-success);
+            color: var(--bg-dark);
+        }
+
+        .tile-grid-admin {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+            gap: var(--space-sm);
+        }
+
+        .tile-status {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-sm);
+            font-family: var(--font-display);
+            font-weight: 700;
+        }
+
+        .tile-status.connected {
+            background: rgba(0, 255, 136, 0.2);
+            border: 2px solid var(--neon-green);
+            color: var(--neon-green);
+        }
+
+        .tile-status.disconnected {
+            background: rgba(255, 0, 68, 0.1);
+            border: 2px solid rgba(255, 0, 68, 0.3);
+            color: var(--text-muted);
+        }
+
+        .log-container {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: var(--radius-sm);
+            padding: var(--space-md);
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .log-time {
+            color: var(--text-muted);
+            margin-right: var(--space-sm);
+        }
+
+        .log-message.info {
+            color: var(--neon-cyan);
+        }
+
+        .log-message.success {
+            color: var(--neon-green);
+        }
+
+        .log-message.warning {
+            color: var(--neon-orange);
+        }
+
+        .log-message.error {
+            color: var(--neon-red);
+        }
+
+        .refresh-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-sm);
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .refresh-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--neon-green);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: var(--space-md) var(--space-lg);
+            background: var(--card-bg);
+            border: 1px solid var(--neon-green);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+
+        .toast.error {
+            border-color: var(--neon-red);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .admin-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .status-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Animated Background -->
+    <div class="bg-animation">
+        <div class="stars"></div>
+        <div class="stars2"></div>
+        <div class="stars3"></div>
+    </div>
+
+    <div class="screen active">
+        <div class="admin-container">
+            <header class="admin-header">
+                <div>
+                    <h1 class="admin-title">🔧 Admin Dashboard</h1>
+                    <div class="refresh-indicator">
+                        <span class="refresh-dot"></span>
+                        <span>Live updates</span>
+                    </div>
+                </div>
+                <a href="/" class="btn btn-secondary">← Terug naar Game</a>
+            </header>
+
+            <div class="admin-grid">
+                <!-- Live Status -->
+                <div class="admin-card">
+                    <h3>📊 Live Status</h3>
+                    <div class="status-grid">
+                        <div class="status-item">
+                            <span class="status-value" id="masterStatus">-</span>
+                            <span class="status-label">Master</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-value" id="tilesConnected">0</span>
+                            <span class="status-label">Tiles Online</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-value" id="frontendsConnected">0</span>
+                            <span class="status-label">Frontends</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-value" id="gamesPlayed">0</span>
+                            <span class="status-label">Games</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Connected Tiles -->
+                <div class="admin-card">
+                    <h3>🎯 Tiles Status</h3>
+                    <div class="tile-grid-admin" id="tileGridAdmin">
+                        <p style="color: var(--text-muted); grid-column: 1/-1; text-align: center;">
+                            Geen tiles verbonden
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Level Configuration -->
+                <div class="admin-card">
+                    <h3>⚙️ Level Configuratie</h3>
+                    <div class="config-form">
+                        <div class="config-row">
+                            <span class="config-label">🌟 Easy - Stappen</span>
+                            <input type="number" class="config-input" id="easySteps" value="4" min="2" max="20">
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">🌟 Easy - Punten/ronde</span>
+                            <input type="number" class="config-input" id="easyPoints" value="10" min="1" max="100">
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">🔥 Medium - Stappen</span>
+                            <input type="number" class="config-input" id="mediumSteps" value="6" min="2" max="20">
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">🔥 Medium - Punten/ronde</span>
+                            <input type="number" class="config-input" id="mediumPoints" value="15" min="1" max="100">
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">💀 Hard - Stappen</span>
+                            <input type="number" class="config-input" id="hardSteps" value="8" min="2" max="20">
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">💀 Hard - Punten/ronde</span>
+                            <input type="number" class="config-input" id="hardPoints" value="25" min="1" max="100">
+                        </div>
+                        <button class="btn btn-success" onclick="saveConfig()">💾 Opslaan</button>
+                    </div>
+                </div>
+
+                <!-- Speed Run Settings -->
+                <div class="admin-card">
+                    <h3>⚡ Speed Run Instellingen</h3>
+                    <div class="config-form">
+                        <div class="config-row">
+                            <span class="config-label">Seconden per stap</span>
+                            <input type="number" class="config-input" id="speedRunTime" value="3" min="1" max="10">
+                        </div>
+                        <div class="config-row">
+                            <span class="config-label">Bonus per sec over</span>
+                            <input type="number" class="config-input" id="speedRunBonus" value="2" min="1" max="10">
+                        </div>
+                        <button class="btn btn-success" onclick="saveSpeedRunConfig()">💾 Opslaan</button>
+                    </div>
+                </div>
+
+                <!-- Leaderboard Management -->
+                <div class="admin-card" style="grid-column: 1 / -1;">
+                    <h3>🏆 Leaderboard Beheer</h3>
+                    <div class="leaderboard-actions">
+                        <button class="btn btn-secondary" onclick="refreshLeaderboard()">🔄 Refresh</button>
+                        <button class="btn btn-danger" onclick="clearLeaderboard()">🗑️ Wis Alles</button>
+                    </div>
+                    <table class="leaderboard-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Team</th>
+                                <th>Score</th>
+                                <th>Level</th>
+                                <th>Rondes</th>
+                                <th>Datum</th>
+                                <th>Actie</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboardBody">
+                            <tr>
+                                <td colspan="7" style="text-align: center; color: var(--text-muted);">
+                                    Laden...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Activity Log -->
+                <div class="admin-card" style="grid-column: 1 / -1;">
+                    <h3>📜 Activiteiten Log</h3>
+                    <div class="log-container" id="logContainer">
+                        <div class="log-entry">
+                            <span class="log-time">--:--:--</span>
+                            <span class="log-message info">Admin dashboard geladen</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration state
+        let config = {
+            levels: {
+                easy: { steps: 4, points: 10 },
+                medium: { steps: 6, points: 15 },
+                hard: { steps: 8, points: 25 }
+            },
+            speedRun: {
+                timePerStep: 3,
+                bonusPerSecond: 2
+            }
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStatus();
+            refreshLeaderboard();
+            loadConfig();
+
+            // Auto-refresh every 5 seconds
+            setInterval(loadStatus, 5000);
+
+            addLog('Admin dashboard gestart', 'info');
+        });
+
+        // Load live status
+        async function loadStatus() {
+            try {
+                const response = await fetch('/status');
+                const data = await response.json();
+
+                // Update status display
+                document.getElementById('masterStatus').textContent = data.master_connected ? 'ON' : 'OFF';
+                document.getElementById('masterStatus').className = 'status-value ' + (data.master_connected ? 'online' : 'offline');
+
+                document.getElementById('tilesConnected').textContent = data.connected_tiles || 0;
+                document.getElementById('frontendsConnected').textContent = data.frontends || 0;
+
+                // Load tiles
+                await loadTiles();
+
+            } catch (error) {
+                console.error('Failed to load status:', error);
+            }
+        }
+
+        // Load tiles status
+        async function loadTiles() {
+            try {
+                const response = await fetch('/api/admin/tiles');
+                const data = await response.json();
+
+                const grid = document.getElementById('tileGridAdmin');
+
+                if (!data.tiles || data.tiles.length === 0) {
+                    grid.innerHTML = '<p style="color: var(--text-muted); grid-column: 1/-1; text-align: center;">Geen tiles geregistreerd</p>';
+                    return;
+                }
+
+                grid.innerHTML = data.tiles.map(tile => `
+                    <div class="tile-status ${tile.connected ? 'connected' : 'disconnected'}">
+                        ${tile.id}
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                console.error('Failed to load tiles:', error);
+            }
+        }
+
+        // Load configuration
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/admin/config');
+                const data = await response.json();
+
+                if (data.levels) {
+                    config.levels = data.levels;
+
+                    document.getElementById('easySteps').value = data.levels.easy?.steps || 4;
+                    document.getElementById('easyPoints').value = data.levels.easy?.points || 10;
+                    document.getElementById('mediumSteps').value = data.levels.medium?.steps || 6;
+                    document.getElementById('mediumPoints').value = data.levels.medium?.points || 15;
+                    document.getElementById('hardSteps').value = data.levels.hard?.steps || 8;
+                    document.getElementById('hardPoints').value = data.levels.hard?.points || 25;
+                }
+
+                if (data.speedRun) {
+                    document.getElementById('speedRunTime').value = data.speedRun.timePerStep || 3;
+                    document.getElementById('speedRunBonus').value = data.speedRun.bonusPerSecond || 2;
+                }
+
+            } catch (error) {
+                console.error('Failed to load config:', error);
+            }
+        }
+
+        // Save level configuration
+        async function saveConfig() {
+            const newConfig = {
+                easy: {
+                    steps: parseInt(document.getElementById('easySteps').value),
+                    points: parseInt(document.getElementById('easyPoints').value)
+                },
+                medium: {
+                    steps: parseInt(document.getElementById('mediumSteps').value),
+                    points: parseInt(document.getElementById('mediumPoints').value)
+                },
+                hard: {
+                    steps: parseInt(document.getElementById('hardSteps').value),
+                    points: parseInt(document.getElementById('hardPoints').value)
+                }
+            };
+
+            try {
+                const response = await fetch('/api/admin/config/levels', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newConfig)
+                });
+
+                if (response.ok) {
+                    showToast('Level configuratie opgeslagen!');
+                    addLog('Level configuratie gewijzigd', 'success');
+                } else {
+                    showToast('Fout bij opslaan', true);
+                }
+            } catch (error) {
+                showToast('Fout bij opslaan', true);
+            }
+        }
+
+        // Save speed run configuration
+        async function saveSpeedRunConfig() {
+            const newConfig = {
+                timePerStep: parseInt(document.getElementById('speedRunTime').value),
+                bonusPerSecond: parseInt(document.getElementById('speedRunBonus').value)
+            };
+
+            try {
+                const response = await fetch('/api/admin/config/speedrun', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newConfig)
+                });
+
+                if (response.ok) {
+                    showToast('Speed Run instellingen opgeslagen!');
+                    addLog('Speed Run configuratie gewijzigd', 'success');
+                } else {
+                    showToast('Fout bij opslaan', true);
+                }
+            } catch (error) {
+                showToast('Fout bij opslaan', true);
+            }
+        }
+
+        // Refresh leaderboard
+        async function refreshLeaderboard() {
+            try {
+                const response = await fetch('/api/leaderboard?limit=50');
+                const data = await response.json();
+
+                const tbody = document.getElementById('leaderboardBody');
+
+                if (!data.leaderboard || data.leaderboard.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Geen scores</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.leaderboard.map((entry, index) => `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${escapeHtml(entry.team_name)}</td>
+                        <td>${entry.score}</td>
+                        <td>${entry.level}</td>
+                        <td>${entry.rounds}</td>
+                        <td>${formatDate(entry.created_at)}</td>
+                        <td>
+                            <button class="delete-btn" onclick="deleteScore(${entry.id || index}, '${escapeHtml(entry.team_name)}')">
+                                🗑️
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+
+            } catch (error) {
+                console.error('Failed to load leaderboard:', error);
+            }
+        }
+
+        // Clear entire leaderboard
+        async function clearLeaderboard() {
+            if (!confirm('Weet je zeker dat je ALLE scores wilt verwijderen?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/leaderboard', {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    showToast('Leaderboard gewist!');
+                    addLog('Leaderboard volledig gewist', 'warning');
+                    refreshLeaderboard();
+                }
+            } catch (error) {
+                showToast('Fout bij wissen', true);
+            }
+        }
+
+        // Delete single score
+        async function deleteScore(id, teamName) {
+            if (!confirm(`Score van "${teamName}" verwijderen?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/leaderboard/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    showToast('Score verwijderd!');
+                    addLog(`Score verwijderd: ${teamName}`, 'warning');
+                    refreshLeaderboard();
+                }
+            } catch (error) {
+                showToast('Fout bij verwijderen', true);
+            }
+        }
+
+        // Add log entry
+        function addLog(message, type = 'info') {
+            const container = document.getElementById('logContainer');
+            const time = new Date().toLocaleTimeString();
+
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `
+                <span class="log-time">${time}</span>
+                <span class="log-message ${type}">${message}</span>
+            `;
+
+            container.insertBefore(entry, container.firstChild);
+
+            // Keep only last 50 entries
+            while (container.children.length > 50) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        // Show toast notification
+        function showToast(message, isError = false) {
+            const toast = document.createElement('div');
+            toast.className = 'toast' + (isError ? ' error' : '');
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // Utility functions
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('nl-BE', {
+                day: '2-digit',
+                month: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+    </script>
+</body>
+
+</html>

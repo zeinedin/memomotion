@@ -207,7 +207,11 @@ function confirmExit() {
 // ============================================
 
 function connectWebSocket() {
-  const wsUrl = `ws://${window.location.host}/ws/frontend`;
+  // Use wss:// for HTTPS, ws:// for HTTP
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${window.location.host}/ws/frontend`;
+
+  console.log('🔌 Connecting to:', wsUrl);
 
   try {
     socket = new WebSocket(wsUrl);
@@ -216,6 +220,9 @@ function connectWebSocket() {
       console.log('🔌 WebSocket connected');
       reconnectAttempts = 0;
       updateConnectionStatus(true);
+
+      // Request initial status
+      sendMessage({ type: 'get_status' });
     };
 
     socket.onclose = () => {
@@ -268,42 +275,76 @@ function sendMessage(message) {
 function handleWebSocketMessage(message) {
   console.log('📩 Received:', message);
 
-  switch (message.type) {
+  // Handle both 'type' and 'event' formats from backend
+  const msgType = message.type || message.event;
+  const msgData = message.data || message;
+
+  switch (msgType) {
+    case 'initial_state':
+      // Initial connection - update master status
+      gameState.masterConnected = msgData.master_connected;
+      updateMasterStatus();
+      console.log(
+        '✓ Initial state received, master:',
+        msgData.master_connected
+      );
+      break;
     case 'status':
-      handleStatusUpdate(message);
+      handleStatusUpdate(msgData);
       break;
     case 'tile_status':
-      updateTileStatus(message.connected_tiles, message.expected_tiles);
+      // Handle different formats
+      if (msgData.tiles) {
+        const tileIds = Object.keys(msgData.tiles).map(Number);
+        const connectedTiles = tileIds.filter(
+          (id) => msgData.tiles[id]?.connected
+        );
+        updateTileStatus(connectedTiles, tileIds.length);
+      } else {
+        updateTileStatus(
+          msgData.connected_tiles || message.connected_tiles,
+          msgData.expected_tiles || message.expected_tiles
+        );
+      }
       break;
     case 'tile_connected':
-      handleTileConnected(message.tile_id);
+      handleTileConnected(msgData.tile_id || message.tile_id);
       break;
     case 'tile_disconnected':
-      handleTileDisconnected(message.tile_id);
+      handleTileDisconnected(msgData.tile_id || message.tile_id);
       break;
     case 'tile_activated':
-      handleTileActivated(message.tile_id);
+      handleTileActivated(msgData.tile_id || message.tile_id);
       break;
     case 'show_pattern':
-      showPattern(message.pattern);
+    case 'pattern_displayed':
+      showPattern(msgData.pattern || message.pattern);
       break;
     case 'player_turn':
       startPlayerTurn(
-        message.expected_count || LEVEL_CONFIG[gameState.level].steps
+        msgData.expected_count ||
+          message.expected_count ||
+          LEVEL_CONFIG[gameState.level].steps
       );
       break;
     case 'step_received':
       handleStepReceived(
-        message.tile_id,
-        message.step_number,
-        message.is_correct
+        msgData.tile_id || message.tile_id,
+        msgData.step_number || message.step_number,
+        msgData.is_correct || message.is_correct
       );
       break;
     case 'round_complete':
-      handleRoundComplete(message.round, message.score);
+      handleRoundComplete(
+        msgData.round || message.round,
+        msgData.score || message.score
+      );
       break;
     case 'game_over':
-      handleGameOver(message.final_score, message.rounds);
+      handleGameOver(
+        msgData.final_score || message.final_score,
+        msgData.rounds || message.rounds
+      );
       break;
     case 'waiting_for_start':
       setMessage('🎮', 'Press the START button on the master to begin!');
@@ -315,15 +356,43 @@ function handleWebSocketMessage(message) {
       updateGameStats();
       setMessage('🚀', 'Game Started! Get ready...');
       break;
+    case 'master_connected':
+      gameState.masterConnected = true;
+      updateMasterStatus();
+      console.log('✓ Master connected');
+      break;
+    case 'master_disconnected':
+      gameState.masterConnected = false;
+      updateMasterStatus();
+      console.log('✗ Master disconnected');
+      break;
+    default:
+      console.log('Unknown message type:', msgType, message);
   }
 }
 
-function handleStatusUpdate(message) {
-  gameState.masterConnected = message.master_connected;
-  updateMasterStatus();
+function handleStatusUpdate(data) {
+  // Handle nested data format from backend
+  const statusData = data.data || data;
 
-  if (message.connected_tiles) {
-    updateTileStatus(message.connected_tiles, message.expected_tiles || 0);
+  if (statusData.master_connected !== undefined) {
+    gameState.masterConnected = statusData.master_connected;
+    updateMasterStatus();
+  }
+
+  if (statusData.connected_tiles) {
+    updateTileStatus(
+      statusData.connected_tiles,
+      statusData.expected_tiles || 0
+    );
+  }
+
+  if (statusData.tiles) {
+    const tileIds = Object.keys(statusData.tiles).map(Number);
+    const connectedTiles = tileIds.filter(
+      (id) => statusData.tiles[id]?.connected
+    );
+    updateTileStatus(connectedTiles, tileIds.length);
   }
 }
 

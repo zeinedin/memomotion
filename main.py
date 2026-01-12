@@ -143,7 +143,7 @@ async def get_leaderboard(limit: int = 10):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT team_name, score, level, rounds, created_at 
+        SELECT id, team_name, score, level, rounds, created_at 
         FROM leaderboard 
         ORDER BY score DESC 
         LIMIT ?
@@ -153,11 +153,12 @@ async def get_leaderboard(limit: int = 10):
     
     leaderboard = [
         {
-            "team_name": row[0],
-            "score": row[1],
-            "level": row[2],
-            "rounds": row[3],
-            "created_at": row[4]
+            "id": row[0],
+            "team_name": row[1],
+            "score": row[2],
+            "level": row[3],
+            "rounds": row[4],
+            "created_at": row[5]
         }
         for row in rows
     ]
@@ -190,6 +191,79 @@ async def clear_leaderboard():
     conn.close()
     
     return {"status": "ok", "message": "Leaderboard cleared"}
+
+# ==================== ADMIN ROUTES ====================
+@app.get("/admin")
+async def admin_page():
+    """Serve admin dashboard"""
+    return FileResponse('static/admin.html')
+
+@app.get("/api/admin/tiles")
+async def get_tiles_status():
+    """Get all tiles status for admin"""
+    tiles = [
+        {"id": tile_id, "connected": info.get("connected", False), "battery": info.get("battery", 0)}
+        for tile_id, info in state.tiles.items()
+    ]
+    return {"tiles": sorted(tiles, key=lambda x: x["id"])}
+
+@app.get("/api/admin/config")
+async def get_config():
+    """Get current game configuration"""
+    return {
+        "levels": {
+            "easy": {"steps": LEVEL_CONFIG["easy"]["pattern_length"], "points": LEVEL_CONFIG["easy"]["points_per_tile"]},
+            "medium": {"steps": LEVEL_CONFIG["medium"]["pattern_length"], "points": LEVEL_CONFIG["medium"]["points_per_tile"]},
+            "hard": {"steps": LEVEL_CONFIG["hard"]["pattern_length"], "points": LEVEL_CONFIG["hard"]["points_per_tile"]}
+        },
+        "speedRun": {
+            "timePerStep": 3,
+            "bonusPerSecond": 2
+        }
+    }
+
+@app.post("/api/admin/config/levels")
+async def update_level_config(config: dict):
+    """Update level configuration"""
+    global LEVEL_CONFIG
+    
+    if "easy" in config:
+        LEVEL_CONFIG["easy"]["pattern_length"] = config["easy"].get("steps", 4)
+        LEVEL_CONFIG["easy"]["points_per_tile"] = config["easy"].get("points", 10)
+    if "medium" in config:
+        LEVEL_CONFIG["medium"]["pattern_length"] = config["medium"].get("steps", 6)
+        LEVEL_CONFIG["medium"]["points_per_tile"] = config["medium"].get("points", 15)
+    if "hard" in config:
+        LEVEL_CONFIG["hard"]["pattern_length"] = config["hard"].get("steps", 8)
+        LEVEL_CONFIG["hard"]["points_per_tile"] = config["hard"].get("points", 25)
+    
+    print(f"✓ Level config updated: {LEVEL_CONFIG}")
+    return {"status": "ok", "config": LEVEL_CONFIG}
+
+@app.post("/api/admin/config/speedrun")
+async def update_speedrun_config(config: dict):
+    """Update speed run configuration"""
+    # Store in state for now (could be persisted to DB)
+    state.speedrun_time_per_step = config.get("timePerStep", 3)
+    state.speedrun_bonus = config.get("bonusPerSecond", 2)
+    
+    print(f"✓ Speed run config updated: {config}")
+    return {"status": "ok"}
+
+@app.delete("/api/admin/leaderboard/{score_id}")
+async def delete_single_score(score_id: int):
+    """Delete a single score from leaderboard"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM leaderboard WHERE id = ?', (score_id,))
+    conn.commit()
+    affected = cursor.rowcount
+    conn.close()
+    
+    if affected > 0:
+        print(f"✓ Score {score_id} deleted")
+        return {"status": "ok", "message": f"Score {score_id} deleted"}
+    return {"status": "error", "message": "Score not found"}
 
 # ==================== MASTER WEBSOCKET ====================
 @app.websocket("/ws/master")
