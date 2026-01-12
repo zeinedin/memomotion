@@ -7,6 +7,7 @@
 const gameState = {
   teamName: '',
   level: 'easy',
+  mode: 'classic',
   score: 0,
   round: 0,
   pattern: [],
@@ -15,6 +16,43 @@ const gameState = {
   expectedTiles: 0,
   masterConnected: false,
   isPlaying: false,
+  timeLeft: 0,
+  timerInterval: null,
+};
+
+// Game Mode Configuration
+const MODE_CONFIG = {
+  classic: {
+    name: 'Classic',
+    description: 'Repeat the pattern shown',
+    icon: '🧠',
+    hasTimer: false,
+    patternGrows: false,
+  },
+  speedrun: {
+    name: 'Speed Run',
+    description: 'Complete patterns before time runs out',
+    icon: '⚡',
+    hasTimer: true,
+    timePerStep: 3, // seconds per step
+    patternGrows: false,
+  },
+  endless: {
+    name: 'Endless',
+    description: 'Pattern grows each round until you fail',
+    icon: '♾️',
+    hasTimer: false,
+    patternGrows: true,
+    startSteps: 2,
+  },
+  simon: {
+    name: 'Simon Says',
+    description: 'Classic Simon Says style with colors',
+    icon: '🎯',
+    hasTimer: false,
+    patternGrows: true,
+    startSteps: 1,
+  },
 };
 
 // Level Configuration
@@ -52,6 +90,7 @@ function cacheElements() {
 
   // Start screen
   elements.teamNameInput = document.getElementById('teamName');
+  elements.modeBtns = document.querySelectorAll('.mode-btn');
   elements.levelBtns = document.querySelectorAll('.level-btn');
   elements.startGameBtn = document.getElementById('startGameBtn');
   elements.viewLeaderboardBtn = document.getElementById('viewLeaderboardBtn');
@@ -60,8 +99,11 @@ function cacheElements() {
   // Game screen
   elements.currentTeamName = document.getElementById('currentTeamName');
   elements.currentLevel = document.getElementById('currentLevel');
+  elements.currentMode = document.getElementById('currentMode');
   elements.currentScore = document.getElementById('currentScore');
   elements.roundNumber = document.getElementById('roundNumber');
+  elements.timerDisplay = document.getElementById('timerDisplay');
+  elements.timerValue = document.getElementById('timerValue');
   elements.backToStartBtn = document.getElementById('backToStartBtn');
   elements.masterDot = document.getElementById('masterDot');
   elements.masterStatus = document.getElementById('masterStatus');
@@ -91,6 +133,16 @@ function cacheElements() {
 }
 
 function setupEventListeners() {
+  // Mode selection
+  elements.modeBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      elements.modeBtns.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      gameState.mode = btn.dataset.mode;
+      updateModeDescription();
+    });
+  });
+
   // Level selection
   elements.levelBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -405,24 +457,61 @@ function startGame() {
 
   // Update UI
   elements.currentTeamName.textContent = teamName;
-  elements.currentLevel.textContent = LEVEL_CONFIG[gameState.level].label;
+  elements.currentLevel.textContent = LEVEL_CONFIG[
+    gameState.level
+  ].label.replace(' Mode', '');
+  elements.currentMode.textContent = MODE_CONFIG[gameState.mode].name;
   updateGameStats();
+
+  // Show/hide timer based on mode
+  const modeConfig = MODE_CONFIG[gameState.mode];
+  if (modeConfig.hasTimer && elements.timerDisplay) {
+    elements.timerDisplay.style.display = 'flex';
+  } else if (elements.timerDisplay) {
+    elements.timerDisplay.style.display = 'none';
+  }
 
   // Hide pattern sections initially
   elements.sequenceSection.classList.remove('visible');
   elements.stepsSection.classList.remove('visible');
 
-  // Set initial message
-  setMessage('⏳', 'Connecting to game master...');
+  // Set initial message based on mode
+  const modeMessage = getModeStartMessage();
+  setMessage(modeConfig.icon, modeMessage);
 
-  // Send game start to backend
+  // Send game start to backend with mode
   sendMessage({
     type: 'start_game',
     team_name: teamName,
     level: gameState.level,
+    mode: gameState.mode,
   });
 
   showScreen('game');
+}
+
+function getModeStartMessage() {
+  switch (gameState.mode) {
+    case 'speedrun':
+      return 'Speed Run! Complete patterns before time runs out!';
+    case 'endless':
+      return 'Endless Mode! Pattern grows each round!';
+    case 'simon':
+      return 'Simon Says! Watch and repeat the sequence!';
+    default:
+      return 'Connecting to game master...';
+  }
+}
+
+function updateModeDescription() {
+  // Visual feedback when mode changes
+  const activeBtn = document.querySelector('.mode-btn.active');
+  if (activeBtn) {
+    activeBtn.style.transform = 'scale(1.02)';
+    setTimeout(() => {
+      activeBtn.style.transform = '';
+    }, 200);
+  }
 }
 
 function resetGame() {
@@ -432,10 +521,21 @@ function resetGame() {
   gameState.pattern = [];
   gameState.playerSteps = [];
 
+  // Clear timer if running
+  if (gameState.timerInterval) {
+    clearInterval(gameState.timerInterval);
+    gameState.timerInterval = null;
+  }
+
   elements.sequenceSection.classList.remove('visible');
   elements.stepsSection.classList.remove('visible');
   elements.sequenceGrid.innerHTML = '';
   elements.stepsGrid.innerHTML = '';
+
+  // Hide timer
+  if (elements.timerDisplay) {
+    elements.timerDisplay.style.display = 'none';
+  }
 
   // Clear tile states
   document.querySelectorAll('.tile').forEach((tile) => {
@@ -449,6 +549,7 @@ function playAgain() {
     type: 'start_game',
     team_name: gameState.teamName,
     level: gameState.level,
+    mode: gameState.mode,
   });
   showScreen('game');
 }
@@ -510,7 +611,21 @@ function showPattern(pattern) {
 
 function startPlayerTurn(expectedCount) {
   gameState.playerSteps = [];
-  setMessage('👟', `Your turn! Repeat the pattern (${expectedCount} steps)`);
+
+  const modeConfig = MODE_CONFIG[gameState.mode];
+
+  // Set message based on mode
+  if (gameState.mode === 'speedrun') {
+    const timeLimit = expectedCount * modeConfig.timePerStep;
+    setMessage('⚡', `Quick! You have ${timeLimit} seconds!`);
+    startTimer(timeLimit);
+  } else if (gameState.mode === 'endless') {
+    setMessage('♾️', `Round ${gameState.round + 1}: ${expectedCount} steps!`);
+  } else if (gameState.mode === 'simon') {
+    setMessage('🎯', `Simon says: repeat ${expectedCount} steps!`);
+  } else {
+    setMessage('👟', `Your turn! Repeat the pattern (${expectedCount} steps)`);
+  }
 
   // Show steps section
   elements.stepsSection.classList.add('visible');
@@ -523,6 +638,69 @@ function startPlayerTurn(expectedCount) {
     box.textContent = i + 1;
     elements.stepsGrid.appendChild(box);
   }
+}
+
+// ============================================
+// TIMER FUNCTIONS (Speed Run Mode)
+// ============================================
+
+function startTimer(seconds) {
+  gameState.timeLeft = seconds;
+  updateTimerDisplay();
+
+  if (elements.timerDisplay) {
+    elements.timerDisplay.style.display = 'flex';
+    elements.timerDisplay.classList.remove('warning');
+  }
+
+  // Clear any existing timer
+  if (gameState.timerInterval) {
+    clearInterval(gameState.timerInterval);
+  }
+
+  gameState.timerInterval = setInterval(() => {
+    gameState.timeLeft--;
+    updateTimerDisplay();
+
+    // Warning when time is low
+    if (gameState.timeLeft <= 5 && elements.timerDisplay) {
+      elements.timerDisplay.classList.add('warning');
+    }
+
+    if (gameState.timeLeft <= 0) {
+      clearInterval(gameState.timerInterval);
+      gameState.timerInterval = null;
+      handleTimeOut();
+    }
+  }, 1000);
+}
+
+function stopTimer() {
+  if (gameState.timerInterval) {
+    clearInterval(gameState.timerInterval);
+    gameState.timerInterval = null;
+  }
+  if (elements.timerDisplay) {
+    elements.timerDisplay.classList.remove('warning');
+  }
+}
+
+function updateTimerDisplay() {
+  if (elements.timerValue) {
+    elements.timerValue.textContent = gameState.timeLeft;
+  }
+}
+
+function handleTimeOut() {
+  setMessage('⏰', "Time's up! Game Over!");
+
+  // Send timeout to backend
+  sendMessage({
+    type: 'timeout',
+    team_name: gameState.teamName,
+    score: gameState.score,
+    round: gameState.round,
+  });
 }
 
 function handleStepReceived(tileId, stepNumber, isCorrect) {
@@ -568,12 +746,28 @@ function handleRoundComplete(round, score) {
   gameState.score = score;
   updateGameStats();
 
-  setMessage(
-    '🎉',
-    `Round ${round} Complete! +${
-      LEVEL_CONFIG[gameState.level].pointsPerRound
-    } points!`
-  );
+  // Stop timer for speed run mode
+  stopTimer();
+
+  // Mode-specific completion message
+  let message = `Round ${round} Complete! +${
+    LEVEL_CONFIG[gameState.level].pointsPerRound
+  } points!`;
+  let icon = '🎉';
+
+  if (gameState.mode === 'speedrun') {
+    const bonus = Math.floor(gameState.timeLeft * 2);
+    message = `Speed bonus: +${bonus}! Total: ${score} points!`;
+    icon = '⚡';
+  } else if (gameState.mode === 'endless') {
+    message = `Endless Round ${round}! Pattern grows...`;
+    icon = '♾️';
+  } else if (gameState.mode === 'simon') {
+    message = `Simon approves! Round ${round} complete!`;
+    icon = '🎯';
+  }
+
+  setMessage(icon, message);
 
   // Clear tile states after a moment
   setTimeout(() => {
@@ -593,6 +787,9 @@ function handleGameOver(finalScore, rounds) {
   gameState.isPlaying = false;
   gameState.score = finalScore;
   gameState.round = rounds;
+
+  // Stop timer if running
+  stopTimer();
 
   // Update game over screen
   elements.finalScore.textContent = finalScore;

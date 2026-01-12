@@ -528,6 +528,147 @@ body {
 }
 
 /* ============================================
+   MODE SELECTOR
+   ============================================ */
+.mode-selector {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-md);
+}
+
+.mode-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md);
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    overflow: hidden;
+    text-align: left;
+}
+
+.mode-glow {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.mode-btn[data-mode="classic"] .mode-glow {
+    background: radial-gradient(circle at center, rgba(0, 245, 255, 0.15), transparent 70%);
+}
+
+.mode-btn[data-mode="speedrun"] .mode-glow {
+    background: radial-gradient(circle at center, rgba(255, 255, 0, 0.15), transparent 70%);
+}
+
+.mode-btn[data-mode="endless"] .mode-glow {
+    background: radial-gradient(circle at center, rgba(170, 0, 255, 0.15), transparent 70%);
+}
+
+.mode-btn[data-mode="simon"] .mode-glow {
+    background: radial-gradient(circle at center, rgba(255, 0, 255, 0.15), transparent 70%);
+}
+
+.mode-btn:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.mode-btn:hover .mode-glow {
+    opacity: 1;
+}
+
+.mode-btn.active {
+    border-color: var(--neon-cyan);
+    color: var(--text-primary);
+    box-shadow: 0 0 25px rgba(0, 245, 255, 0.3);
+}
+
+.mode-btn.active[data-mode="classic"] {
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 25px rgba(0, 245, 255, 0.3);
+}
+
+.mode-btn.active[data-mode="speedrun"] {
+    border-color: var(--neon-yellow);
+    box-shadow: 0 0 25px rgba(255, 255, 0, 0.3);
+}
+
+.mode-btn.active[data-mode="endless"] {
+    border-color: var(--neon-purple);
+    box-shadow: 0 0 25px rgba(170, 0, 255, 0.3);
+}
+
+.mode-btn.active[data-mode="simon"] {
+    border-color: var(--neon-magenta);
+    box-shadow: 0 0 25px rgba(255, 0, 255, 0.3);
+}
+
+.mode-btn.active .mode-glow {
+    opacity: 1;
+}
+
+.mode-icon {
+    font-size: 2rem;
+    z-index: 1;
+    min-width: 40px;
+    text-align: center;
+}
+
+.mode-info {
+    display: flex;
+    flex-direction: column;
+    z-index: 1;
+    flex: 1;
+}
+
+.mode-name {
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+
+.mode-desc {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+/* Timer box styling */
+.timer-box .stat-value {
+    background: var(--gradient-danger);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.timer-box.warning .stat-value {
+    animation: timerPulse 0.5s ease-in-out infinite;
+}
+
+@keyframes timerPulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* ============================================
    BUTTONS
    ============================================ */
 .btn {
@@ -1375,6 +1516,10 @@ body {
         font-size: 2.5rem;
     }
 
+    .mode-selector {
+        grid-template-columns: 1fr;
+    }
+
     .level-selector {
         grid-template-columns: 1fr;
     }
@@ -1391,7 +1536,11 @@ body {
     }
 
     .game-stats {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .game-stats .timer-box {
+        grid-column: span 2;
     }
 
     .tile {
