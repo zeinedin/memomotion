@@ -26,7 +26,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
 # ==================== STATE ====================
 class GameState:
     def __init__(self):
@@ -399,6 +398,8 @@ async def startup():
     print(f"  Frontend endpoint: ws://YOUR_IP:8000/ws/frontend")
     print(f"  Health check: http://YOUR_IP:8000/")
     print("\nWaiting for connections...\n")
+    
+app.mount("/", StaticFiles(directory="static"), name="static")
 
 if __name__ == "__main__":
     import uvicorn
