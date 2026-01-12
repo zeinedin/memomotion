@@ -1,0 +1,80 @@
+# ==========================
+# PYTHON BASICS
+# ==========================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# ==========================
+# VIRTUAL ENVIRONMENTS
+# ==========================
+# Mappen waar je libraries in staan (wil je niet uploaden)
+venv/
+env/
+.env/
+.venv/
+
+# ==========================
+# ENVIRONMENT VARIABLES (SECURITY!)
+# ==========================
+# Bevat vaak wachtwoorden of API keys - NOOIT uploaden!
+.env
+.env.local
+
+# ==========================
+# DISTRIBUTION / BUILD
+# ==========================
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ==========================
+# TESTING & LINTING
+# ==========================
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# ==========================
+# IDE & EDITORS
+# ==========================
+# VS Code settings (optioneel: soms wil je settings.json wel delen, maar meestal niet)
+.vscode/
+# PyCharm / IntelliJ
+.idea/
+
+# ==========================
+# OS FILES
+# ==========================
+# Mac
+.DS_Store
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ==========================
+# ESP32 / PLATFORMIO (Indien van toepassing)
+# ==========================
+.pio/
+.pioenvs/
+.piolibdeps/
+*.bin
+*.elf

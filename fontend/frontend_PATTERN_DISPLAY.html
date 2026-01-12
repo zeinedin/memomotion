@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory XXL - Pattern Display</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1F2937 0%, #111827 100%);
+            color: #F3F4F6;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #FF6B9D 0%, #8B5CF6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #9CA3AF;
+            margin-top: 10px;
+        }
+
+        /* Stats */
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: #374151;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+
+        .stat-label {
+            color: #9CA3AF;
+            margin-top: 5px;
+        }
+
+        /* Status */
+        .status {
+            background: #374151;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 0;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #EF4444;
+        }
+
+        .dot.connected {
+            background: #10B981;
+            box-shadow: 0 0 10px #10B981;
+        }
+
+        /* Pattern Display */
+        .pattern-section {
+            background: #374151;
+            padding: 30px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .pattern-section.show {
+            display: block;
+        }
+
+        .pattern-title {
+            text-align: center;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+        }
+
+        .pattern-grid {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .pattern-tile {
+            width: 80px;
+            height: 80px;
+            background: #1F2937;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: 700;
+            border: 3px solid #374151;
+            transition: all 0.3s ease;
+        }
+
+        .pattern-tile.highlight {
+            background: linear-gradient(135deg, #FF6B9D 0%, #8B5CF6 100%);
+            border-color: #FF6B9D;
+            transform: scale(1.1);
+            animation: pulse 0.5s ease-in-out;
+        }
+
+        .pattern-tile.correct {
+            background: #10B981;
+            border-color: #10B981;
+        }
+
+        .pattern-tile.wrong {
+            background: #EF4444;
+            border-color: #EF4444;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1.1); }
+            50% { transform: scale(1.2); }
+        }
+
+        /* Player Steps */
+        .steps-section {
+            background: #374151;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .steps-section.show {
+            display: block;
+        }
+
+        .steps-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .step-indicator {
+            width: 50px;
+            height: 50px;
+            background: #1F2937;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            border: 2px solid #374151;
+        }
+
+        /* Message */
+        .message {
+            background: #374151;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .message.show {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .message.success {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+        }
+
+        .message.error {
+            background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* Actions */
+        .actions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 18px 32px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #FF6B9D 0%, #8B5CF6 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(255, 107, 157, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>MEMORY XXL</h1>
+            <p class="subtitle">Watch, Remember, Step!</p>
+        </header>
+
+        <!-- Stats -->
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="gamesPlayed">0</div>
+                <div class="stat-label">Total Games</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="highScore">0</div>
+                <div class="stat-label">High Score</div>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div class="status">
+            <div class="status-item">
+                <span class="dot" id="masterDot"></span>
+                <span id="masterStatus">Master: Connecting...</span>
+            </div>
+            <div class="status-item">
+                <span class="dot" id="tilesDot"></span>
+                <span id="tilesStatus">Tiles: 0/0</span>
+            </div>
+        </div>
+
+        <!-- Pattern Display -->
+        <div class="pattern-section" id="patternSection">
+            <div class="pattern-title" id="patternTitle">The Pattern</div>
+            <div class="pattern-grid" id="patternGrid"></div>
+        </div>
+
+        <!-- Player Steps -->
+        <div class="steps-section" id="stepsSection">
+            <div class="pattern-title">Your Steps</div>
+            <div class="steps-grid" id="stepsGrid"></div>
+        </div>
+
+        <!-- Message -->
+        <div class="message" id="message">
+            <div id="messageText">Ready!</div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="message show">
+            <div>
+                <strong>How to Play:</strong><br>
+                1. Press START button → Watch pattern<br>
+                2. Step on tiles in same order<br>
+                3. Press START again → Check if correct!
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const WS_HOST = window.location.hostname || 'localhost';
+        const WS_URL = `ws://${WS_HOST}:8000/ws/frontend`;
+
+        let ws = null;
+        let state = {
+            pattern: [],
+            playerSteps: [],
+            gamePhase: 'idle'
+        };
+
+        // Connect WebSocket
+        function connect() {
+            ws = new WebSocket(WS_URL);
+
+            ws.onopen = () => {
+                console.log('✓ Connected');
+            };
+
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                handleMessage(msg);
+            };
+
+            ws.onclose = () => {
+                console.log('✗ Disconnected');
+                setTimeout(connect, 3000);
+            };
+        }
+
+        function handleMessage(msg) {
+            console.log('←', msg.event);
+
+            switch (msg.event) {
+                case 'initial_state':
+                    updateStatus(msg.data);
+                    break;
+
+                case 'master_status':
+                    updateMasterStatus(msg.data.connected);
+                    break;
+
+                case 'tile_status':
+                    updateTileStatus(msg.data);
+                    break;
+
+                case 'game_started':
+                    showPattern(msg.data.pattern);
+                    showMessage(msg.data.message);
+                    break;
+
+                case 'pattern_displayed':
+                    state.pattern = msg.data.pattern;
+                    showMessage(msg.data.message);
+                    break;
+
+                case 'memorizing_phase':
+                    state.gamePhase = 'memorizing';
+                    state.playerSteps = [];
+                    document.getElementById('stepsSection').classList.add('show');
+                    showMessage(msg.data.message);
+                    break;
+
+                case 'player_stepped':
+                    addPlayerStep(msg.data.tile_id);
+                    break;
+
+                case 'pattern_correct':
+                    showResult(true, msg.data);
+                    break;
+
+                case 'pattern_wrong':
+                    showResult(false, msg.data);
+                    break;
+
+                case 'game_ended':
+                    updateStats(msg.data);
+                    setTimeout(reset, 3000);
+                    break;
+            }
+        }
+
+        function showPattern(pattern) {
+            state.pattern = pattern;
+            state.playerSteps = [];
+            
+            const grid = document.getElementById('patternGrid');
+            grid.innerHTML = '';
+
+            pattern.forEach((tileId, index) => {
+                const tile = document.createElement('div');
+                tile.className = 'pattern-tile';
+                tile.textContent = tileId;
+                tile.style.animationDelay = `${index * 0.1}s`;
+                grid.appendChild(tile);
+            });
+
+            document.getElementById('patternSection').classList.add('show');
+            document.getElementById('stepsSection').classList.remove('show');
+        }
+
+        function addPlayerStep(tileId) {
+            state.playerSteps.push(tileId);
+
+            const stepsGrid = document.getElementById('stepsGrid');
+            const step = document.createElement('div');
+            step.className = 'step-indicator';
+            step.textContent = tileId;
+            stepsGrid.appendChild(step);
+        }
+
+        function showResult(correct, data) {
+            const patternGrid = document.getElementById('patternGrid');
+            const tiles = patternGrid.children;
+
+            if (correct) {
+                // Highlight all as correct
+                for (let tile of tiles) {
+                    tile.classList.add('correct');
+                }
+                showMessage('🎉 Perfect! You got it right!', 'success');
+            } else {
+                // Show which were wrong
+                data.player_steps.forEach((stepId, index) => {
+                    if (tiles[index]) {
+                        if (stepId === data.expected[index]) {
+                            tiles[index].classList.add('correct');
+                        } else {
+                            tiles[index].classList.add('wrong');
+                        }
+                    }
+                });
+                showMessage('Oops! Try again!', 'error');
+            }
+        }
+
+        function showMessage(text, type = '') {
+            const msg = document.getElementById('message');
+            const msgText = document.getElementById('messageText');
+            
+            msgText.textContent = text;
+            msg.className = `message show ${type}`;
+
+            if (type) {
+                setTimeout(() => {
+                    msg.classList.remove('show');
+                }, 3000);
+            }
+        }
+
+        function reset() {
+            state.pattern = [];
+            state.playerSteps = [];
+            state.gamePhase = 'idle';
+            
+            document.getElementById('patternSection').classList.remove('show');
+            document.getElementById('stepsSection').classList.remove('show');
+            document.getElementById('stepsGrid').innerHTML = '';
+            document.getElementById('message').classList.remove('show');
+        }
+
+        function updateMasterStatus(connected) {
+            const dot = document.getElementById('masterDot');
+            const status = document.getElementById('masterStatus');
+            
+            if (connected) {
+                dot.classList.add('connected');
+                status.textContent = 'Master: Connected';
+            } else {
+                dot.classList.remove('connected');
+                status.textContent = 'Master: Disconnected';
+            }
+        }
+
+        function updateTileStatus(data) {
+            const dot = document.getElementById('tilesDot');
+            const status = document.getElementById('tilesStatus');
+            
+            status.textContent = `Tiles: ${data.connected}/${data.total}`;
+            
+            if (data.connected > 0) {
+                dot.classList.add('connected');
+            } else {
+                dot.classList.remove('connected');
+            }
+        }
+
+        function updateStats(data) {
+            document.getElementById('gamesPlayed').textContent = data.games_played;
+            document.getElementById('highScore').textContent = data.high_score;
+        }
+
+        function updateStatus(data) {
+            updateMasterStatus(data.master_connected);
+            if (data.tiles) {
+                updateTileStatus({
+                    total: Object.keys(data.tiles).length,
+                    connected: Object.values(data.tiles).filter(t => t.connected).length
+                });
+            }
+            updateStats(data);
+        }
+
+        // Start connection
+        connect();
+    </script>
+</body>
+</html>
