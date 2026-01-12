@@ -26,6 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
 # ==================== STATE ====================
 class GameState:
     def __init__(self):
@@ -48,7 +49,7 @@ class GameState:
 state = GameState()
 
 # ==================== ROUTES ====================
-@app.get("/")
+@app.get("/status")
 async def root():
     """Health check"""
     return {
@@ -60,7 +61,9 @@ async def root():
         "tiles": len(state.tiles),
         "connected_tiles": sum(1 for t in state.tiles.values() if t.get("connected", False))
     }
-
+@app.get('/')
+async def read_index():
+    return FileResponse('static/index.html')
 @app.get("/api/stats")
 async def get_stats():
     """Get game statistics"""
