@@ -1,207 +1,95 @@
-// CONFIGURATIE (Direct naar Azure)
-const wsUrl = "wss://memo-motion.azurewebsites.net/ws/frontend";
+// === CONFIG ===
+const wsUrl = "wss://memo-motion.azurewebsites.net/ws/frontend"; 
+let ws = new WebSocket(wsUrl);
+let currentLevel = "Normal";
 
-console.log("Connecting to:", wsUrl);
-
-let ws = null;
-let state = {
-    pattern: [],
-    playerSteps: [],
-    gamePhase: 'idle'
-};
-
-// Connect WebSocket
-function connect() {
-    // Let op: we gebruiken hier de variabele wsUrl (kleine letters)
-    ws = new WebSocket(wsUrl);
-
-    ws.onopen = () => {
-        console.log('✓ Connected');
-    };
-
-    ws.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        handleMessage(msg);
-    };
-
-    ws.onclose = () => {
-        console.log('✗ Disconnected');
-        setTimeout(connect, 3000);
-    };
+// === NAVIGATIE ===
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
 }
 
-function handleMessage(msg) {
-    console.log('←', msg.event);
-
-    switch (msg.event) {
-        case 'initial_state':
-            updateStatus(msg.data);
-            break;
-
-        case 'master_status':
-            updateMasterStatus(msg.data.connected);
-            break;
-
-        case 'tile_status':
-            updateTileStatus(msg.data);
-            break;
-
-        case 'game_started':
-            showPattern(msg.data.pattern);
-            showMessage(msg.data.message);
-            break;
-
-        case 'pattern_displayed':
-            state.pattern = msg.data.pattern;
-            showMessage(msg.data.message);
-            break;
-
-        case 'memorizing_phase':
-            state.gamePhase = 'memorizing';
-            state.playerSteps = [];
-            document.getElementById('stepsSection').classList.add('show');
-            showMessage(msg.data.message);
-            break;
-
-        case 'player_stepped':
-            addPlayerStep(msg.data.tile_id);
-            break;
-
-        case 'pattern_correct':
-            showResult(true, msg.data);
-            break;
-
-        case 'pattern_wrong':
-            showResult(false, msg.data);
-            break;
-
-        case 'game_ended':
-            updateStats(msg.data);
-            setTimeout(reset, 3000);
-            break;
-    }
+function selectLevel(lvl, btn) {
+    currentLevel = lvl;
+    document.querySelectorAll('.lvl-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
 }
 
-function showPattern(pattern) {
-    state.pattern = pattern;
-    state.playerSteps = [];
+// === API CALLS ===
+async function registerTeam() {
+    const name = document.getElementById('teamName').value;
+    if(!name) return alert("Enter a name!");
 
-    const grid = document.getElementById('patternGrid');
-    grid.innerHTML = '';
-
-    pattern.forEach((tileId, index) => {
-        const tile = document.createElement('div');
-        tile.className = 'pattern-tile';
-        tile.textContent = tileId;
-        tile.style.animationDelay = `${index * 0.1}s`;
-        grid.appendChild(tile);
+    // Stuur naar Backend API
+    await fetch('/api/register', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ team_name: name, level: currentLevel })
     });
 
-    document.getElementById('patternSection').classList.add('show');
-    document.getElementById('stepsSection').classList.remove('show');
+    document.getElementById('displayTeam').innerText = name;
+    showScreen('screen-game');
+    
+    // Start het spel via WebSocket
+    ws.send(JSON.stringify({ event: "start_game" }));
 }
 
-function addPlayerStep(tileId) {
-    state.playerSteps.push(tileId);
-
-    const stepsGrid = document.getElementById('stepsGrid');
-    const step = document.createElement('div');
-    step.className = 'step-indicator';
-    step.textContent = tileId;
-    stepsGrid.appendChild(step);
+async function loadLeaderboard() {
+    const res = await fetch('/api/leaderboard');
+    const data = await res.json();
+    
+    const tbody = document.querySelector('#lbTable tbody');
+    tbody.innerHTML = "";
+    
+    data.forEach(row => {
+        tbody.innerHTML += `<tr><td>${row.rank}</td><td>${row.name}</td><td>${row.score}</td></tr>`;
+    });
+    showScreen('screen-leaderboard');
 }
 
-function showResult(correct, data) {
-    const patternGrid = document.getElementById('patternGrid');
-    const tiles = patternGrid.children;
+// === WEBSOCKET GAME LOGIC ===
+ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    const data = msg.data;
 
-    if (correct) {
-        // Highlight all as correct
-        for (let tile of tiles) {
-            tile.classList.add('correct');
-        }
-        showMessage('🎉 Perfect! You got it right!', 'success');
-    } else {
-        // Show which were wrong
-        data.player_steps.forEach((stepId, index) => {
-            if (tiles[index]) {
-                if (stepId === data.expected[index]) {
-                    tiles[index].classList.add('correct');
-                } else {
-                    tiles[index].classList.add('wrong');
-                }
-            }
+    if (msg.event === 'game_started') {
+        const grid = document.getElementById('gameGrid');
+        grid.innerHTML = "";
+        
+        // Maak tegels (Visueel)
+        data.pattern.forEach((id, index) => {
+            const tile = document.createElement('div');
+            tile.className = 'tile';
+            tile.dataset.id = id; // Wel ID opslaan voor logica, maar niet tonen
+            
+            // Animatie
+            setTimeout(() => {
+                tile.classList.add('highlight');
+            }, index * 500); 
+
+            grid.appendChild(tile);
         });
-        showMessage('Oops! Try again!', 'error');
+        document.getElementById('gameMessage').innerText = data.message;
     }
-}
 
-function showMessage(text, type = '') {
-    const msg = document.getElementById('message');
-    const msgText = document.getElementById('messageText');
+    if (msg.event === 'memorizing_phase') {
+        document.getElementById('gameMessage').innerText = data.message;
+        // Verwijder highlights
+        document.querySelectorAll('.tile').forEach(t => t.classList.remove('highlight'));
+    }
 
-    msgText.textContent = text;
-    msg.className = `message show ${type}`;
+    if (msg.event === 'player_stepped') {
+        // Vind de visuele tegel die overeenkomt met de stap
+        // Dit is simpel; in het echt moet je weten welke tegel bij welk ID hoort.
+        // Voor nu kleuren we de laatst toegevoegde div (simulatie)
+        // OF we maken vaste tegels. Voor demo is dit OK.
+    }
 
-    if (type) {
+    if (msg.event === 'game_ended') {
+        document.getElementById('gameMessage').innerText = data.message;
         setTimeout(() => {
-            msg.classList.remove('show');
+            if(data.won) loadLeaderboard(); // Ga naar leaderboard bij winst
+            else showScreen('screen-start');
         }, 3000);
     }
-}
-
-function reset() {
-    state.pattern = [];
-    state.playerSteps = [];
-    state.gamePhase = 'idle';
-
-    document.getElementById('patternSection').classList.remove('show');
-    document.getElementById('stepsSection').classList.remove('show');
-    document.getElementById('stepsGrid').innerHTML = '';
-    document.getElementById('message').classList.remove('show');
-}
-
-function updateMasterStatus(connected) {
-    const dot = document.getElementById('masterDot');
-    const status = document.getElementById('masterStatus');
-
-    if (connected) {
-        dot.classList.add('connected');
-        status.textContent = 'Master: Connected';
-    } else {
-        dot.classList.remove('connected');
-        status.textContent = 'Master: Disconnected';
-    }
-}
-
-function updateTileStatus(data) {
-    const dot = document.getElementById('tilesDot');
-    const status = document.getElementById('tilesStatus');
-
-    status.textContent = `Tiles: ${data.connected}/${data.total}`;
-
-    if (data.connected > 0) {
-        dot.classList.add('connected');
-    } else {
-        dot.classList.remove('connected');
-    }
-}
-
-function updateStats(data) {
-    document.getElementById('gamesPlayed').textContent = data.games_played;
-    document.getElementById('highScore').textContent = data.high_score;
-}
-
-function updateStatus(data) {
-    updateMasterStatus(data.master_connected);
-    if (data.tiles) {
-        updateTileStatus({
-            total: Object.keys(data.tiles).length,
-            connected: Object.values(data.tiles).filter(t => t.connected).length
-        });
-    }
-    updateStats(data);
-}
-
-// Start connection
-connect();
+};

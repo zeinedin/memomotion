@@ -3,98 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Memory XXL - Pattern Display</title>
+    <title>Memory XXL</title>
     <style>
-        /* Je CSS staat hier (ongewijzigd) */
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #1F2937 0%, #111827 100%); color: #F3F4F6; min-height: 100vh; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; }
-        header { text-align: center; margin-bottom: 30px; }
-        h1 { font-size: 3rem; font-weight: 900; background: linear-gradient(135deg, #FF6B9D 0%, #8B5CF6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-        .subtitle { color: #9CA3AF; margin-top: 10px; }
-        .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
-        .stat-card { background: #374151; padding: 20px; border-radius: 12px; text-align: center; }
-        .stat-value { font-size: 2.5rem; font-weight: 700; }
-        .stat-label { color: #9CA3AF; margin-top: 5px; }
-        .status { background: #374151; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
-        .status-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
-        .dot { width: 12px; height: 12px; border-radius: 50%; background: #EF4444; }
-        .dot.connected { background: #10B981; box-shadow: 0 0 10px #10B981; }
-        .pattern-section { background: #374151; padding: 30px; border-radius: 16px; margin-bottom: 20px; display: none; }
-        .pattern-section.show { display: block; }
-        .pattern-title { text-align: center; font-size: 1.5rem; margin-bottom: 20px; }
-        .pattern-grid { display: flex; justify-content: center; flex-wrap: wrap; gap: 15px; }
-        .pattern-tile { width: 80px; height: 80px; background: #1F2937; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 700; border: 3px solid #374151; transition: all 0.3s ease; }
-        .pattern-tile.highlight { background: linear-gradient(135deg, #FF6B9D 0%, #8B5CF6 100%); border-color: #FF6B9D; transform: scale(1.1); animation: pulse 0.5s ease-in-out; }
-        .pattern-tile.correct { background: #10B981; border-color: #10B981; }
-        .pattern-tile.wrong { background: #EF4444; border-color: #EF4444; }
-        @keyframes pulse { 0%, 100% { transform: scale(1.1); } 50% { transform: scale(1.2); } }
-        .steps-section { background: #374151; padding: 20px; border-radius: 12px; margin-bottom: 20px; display: none; }
-        .steps-section.show { display: block; }
-        .steps-grid { display: flex; flex-wrap: wrap; gap: 10px; }
-        .step-indicator { width: 50px; height: 50px; background: #1F2937; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; border: 2px solid #374151; }
-        .message { background: #374151; padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 20px; display: none; }
-        .message.show { display: block; animation: slideIn 0.3s ease-out; }
-        .message.success { background: linear-gradient(135deg, #10B981 0%, #059669 100%); }
-        .message.error { background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%); }
-        @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .hidden { display: none !important; }
+        body { font-family: 'Segoe UI', sans-serif; background: #111827; color: white; text-align: center; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        
+        /* SCHERMEN */
+        .screen { display: none; animation: fadeIn 0.5s; }
+        .screen.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* INPUTS */
+        .card { background: #1F2937; padding: 30px; border-radius: 15px; margin-top: 20px; }
+        input { padding: 15px; width: 80%; border-radius: 8px; border: none; font-size: 1.2rem; margin-bottom: 20px; }
+        
+        /* BUTTONS */
+        .btn { padding: 15px 30px; font-size: 1.2rem; border: none; border-radius: 8px; cursor: pointer; color: white; margin: 5px; transition: 0.2s; }
+        .btn-primary { background: linear-gradient(45deg, #EC4899, #8B5CF6); }
+        .btn-secondary { background: #374151; }
+        .btn:hover { transform: scale(1.05); }
+        
+        .lvl-btn { background: #374151; opacity: 0.6; }
+        .lvl-btn.selected { opacity: 1; background: #8B5CF6; border: 2px solid white; }
+
+        /* GAME GRID (Geen nummers!) */
+        .grid { display: flex; justify-content: center; gap: 15px; margin-top: 30px; flex-wrap: wrap; }
+        .tile {
+            width: 80px; height: 80px;
+            background: #374151;
+            border-radius: 12px;
+            border: 3px solid #4B5563;
+            /* Verberg Nummers */
+            font-size: 0; 
+            color: transparent;
+            transition: 0.2s;
+        }
+        .tile.highlight { background: #EC4899; box-shadow: 0 0 20px #EC4899; transform: scale(1.1); }
+        .tile.correct { background: #10B981; }
+        .tile.wrong { background: #EF4444; }
+
+        /* LEADERBOARD */
+        table { width: 100%; text-align: left; border-collapse: collapse; }
+        th, td { padding: 10px; border-bottom: 1px solid #374151; }
+        th { color: #9CA3AF; }
+        tr:first-child td { color: #FCD34D; font-weight: bold; }
     </style>
 </head>
-
 <body>
-    <div class="container">
-        <header>
-            <h1>MEMORY XXL</h1>
-            <p class="subtitle">Watch, Remember, Step!</p>
-        </header>
 
-        <div class="stats">
-            <div class="stat-card">
-                <div class="stat-value" id="gamesPlayed">0</div>
-                <div class="stat-label">Total Games</div>
+<div class="container">
+    <h1>MEMORY XXL</h1>
+
+    <div id="screen-start" class="screen active">
+        <div class="card">
+            <h2>Join Game</h2>
+            <input type="text" id="teamName" placeholder="Team Name">
+            
+            <div style="margin-bottom: 20px;">
+                <button class="btn lvl-btn" onclick="selectLevel('Easy', this)">Easy</button>
+                <button class="btn lvl-btn selected" onclick="selectLevel('Normal', this)">Normal</button>
+                <button class="btn lvl-btn" onclick="selectLevel('Hard', this)">Hard</button>
             </div>
-            <div class="stat-card">
-                <div class="stat-value" id="highScore">0</div>
-                <div class="stat-label">High Score</div>
-            </div>
-        </div>
 
-        <div class="status">
-            <div class="status-item">
-                <span class="dot" id="masterDot"></span>
-                <span id="masterStatus">Master: Connecting...</span>
-            </div>
-            <div class="status-item">
-                <span class="dot" id="tilesDot"></span>
-                <span id="tilesStatus">Tiles: 0/0</span>
-            </div>
-        </div>
-
-        <div class="pattern-section" id="patternSection">
-            <div class="pattern-title" id="patternTitle">The Pattern</div>
-            <div class="pattern-grid" id="patternGrid"></div>
-        </div>
-
-        <div class="steps-section" id="stepsSection">
-            <div class="pattern-title">Your Steps</div>
-            <div class="steps-grid" id="stepsGrid"></div>
-        </div>
-
-        <div class="message" id="message">
-            <div id="messageText">Ready!</div>
-        </div>
-
-        <div class="message show">
-            <div>
-                <strong>How to Play:</strong><br>
-                1. Press START button → Watch pattern<br>
-                2. Step on tiles in same order<br>
-                3. Press START again → Check if correct!
-            </div>
+            <button class="btn btn-primary" onclick="registerTeam()">START GAME</button>
+            <br><br>
+            <button class="btn btn-secondary" onclick="loadLeaderboard()">🏆 Leaderboard</button>
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <div id="screen-game" class="screen">
+        <h3>Team: <span id="displayTeam"></span></h3>
+        <h2 id="gameMessage">Wait for pattern...</h2>
+        <div id="gameGrid" class="grid"></div>
+        <br>
+        <button class="btn btn-secondary" onclick="showScreen('screen-start')">Quit</button>
+    </div>
+
+    <div id="screen-leaderboard" class="screen">
+        <div class="card">
+            <h2>Top Scores</h2>
+            <table id="lbTable">
+                <thead><tr><th>#</th><th>Team</th><th>Score</th></tr></thead>
+                <tbody></tbody>
+            </table>
+            <button class="btn btn-secondary" onclick="showScreen('screen-start')">Back</button>
+        </div>
+    </div>
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>
