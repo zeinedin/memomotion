@@ -34,15 +34,15 @@ class GameState:
         self.frontend_connections: List[WebSocket] = []
         
         self.tiles: Dict[int, dict] = {}  # tile_id -> {connected, battery}
-        
-        # Game states
-        self.game_phase: str = "idle"  # idle, showing_pattern, memorizing, checking
-        self.pattern: List[int] = []
-        self.player_steps: List[int] = []
-        
+        self.current_game: Optional[dict] = None
         self.games_played = 0
         self.high_score = 0
-        self.current_score = 0
+        
+        # Game session
+        self.pattern: List[int] = []
+        self.player_progress = 0
+        self.round_score = 0
+        self.game_active = False
         self.start_time = None
 
 state = GameState()
@@ -55,10 +55,8 @@ async def root():
         "status": "online",
         "version": "testing-jan9",
         "master_connected": state.master_id is not None,
-        "master_id": state.master_id,
         "frontends": len(state.frontend_connections),
-        "tiles": len(state.tiles),
-        "connected_tiles": sum(1 for t in state.tiles.values() if t.get("connected", False))
+        "tiles": len(state.tiles)
     }
 
 @app.get("/api/stats")
@@ -119,18 +117,13 @@ async def handle_master_message(msg: dict):
     
     if event == "tile_status":
         # Update tile status
-        tiles_data = data.get("tiles", [])
-        print(f"  Received {len(tiles_data)} tiles")
-        
-        for tile in tiles_data:
+        tiles = data.get("tiles", [])
+        for tile in tiles:
             tile_id = tile["id"]
             state.tiles[tile_id] = {
                 "connected": tile["connected"],
                 "battery": tile.get("battery", 100)
             }
-            print(f"    Tile {tile_id}: {tile['connected']}")
-        
-        print(f"  Total tiles in state: {len(state.tiles)}")
         
         # Broadcast to frontends
         await broadcast_to_frontends({
@@ -144,20 +137,16 @@ async def handle_master_message(msg: dict):
     
     elif event == "start_button_pressed":
         print("→ START button pressed!")
-        await handle_start_button()
+        await start_new_game()
     
     elif event == "player_step":
         await handle_player_step(data)
     
     elif event == "pattern_shown":
-        print("✓ Pattern displayed on tiles")
-        # Pattern is now showing - tell frontend
+        print("✓ Pattern displayed")
         await broadcast_to_frontends({
-            "event": "pattern_displayed",
-            "data": {
-                "message": "Now memorize the pattern!",
-                "pattern": state.pattern
-            }
+            "event": "pattern_complete",
+            "data": {"message": "Watch and remember!"}
         })
 
 # ==================== FRONTEND WEBSOCKET ====================
@@ -172,6 +161,8 @@ async def frontend_websocket(websocket: WebSocket):
         "event": "initial_state",
         "data": {
             "master_connected": state.master_id is not None,
+            "tiles": state.tiles,
+            "game_active": state.game_active,
             "games_played": state.games_played,
             "high_score": state.high_score
         }
@@ -208,10 +199,10 @@ async def handle_frontend_message(msg: dict, websocket: WebSocket):
         await start_new_game()
 
 # ==================== GAME LOGIC ====================
-async def handle_start_button():
-    """Handle START button press - two modes"""
+async def start_new_game():
+    """Start a new game session"""
     if not state.master_ws:
-        print("✗ No master connected")
+        print("✗ Cannot start - no master")
         return
     
     connected_tiles = [tid for tid, info in state.tiles.items() if info["connected"]]
@@ -219,151 +210,158 @@ async def handle_start_button():
         print("✗ Need at least 2 tiles")
         await broadcast_to_frontends({
             "event": "error",
-            "data": {"message": "Need at least 2 connected tiles"}
+            "data": {"message": "Need at least 2 tiles connected"}
         })
         return
     
-    if state.game_phase == "idle":
-        # First press: Show pattern
-        await start_show_pattern(connected_tiles)
+    print(f"→ Starting game with {len(connected_tiles)} tiles")
     
-    elif state.game_phase == "memorizing":
-        # Second press: Check pattern
-        await check_pattern()
-
-async def start_show_pattern(connected_tiles: List[int]):
-    """Generate and show pattern"""
-    print("→ Showing pattern...")
+    # Reset game state
+    state.game_active = True
+    state.player_progress = 0
+    state.round_score = 0
+    state.start_time = datetime.now()
     
-    state.game_phase = "showing_pattern"
-    state.player_steps = []
-    state.current_score = 0
-    
-    # Generate pattern (start with 4 tiles)
-    pattern_length = 4
+    # Generate pattern (start with 3 tiles)
+    pattern_length = 3
     state.pattern = [random.choice(connected_tiles) for _ in range(pattern_length)]
     
     print(f"  Pattern: {state.pattern}")
     
-    # Tell frontend
+    # Notify frontend
     await broadcast_to_frontends({
         "event": "game_started",
         "data": {
-            "phase": "showing_pattern",
-            "pattern": state.pattern,
+            "pattern_length": pattern_length,
             "message": "Watch the pattern!"
         }
     })
     
-    # Tell master to show pattern on tiles
+    # Send pattern to master
     await state.master_ws.send_json({
         "event": "show_pattern",
         "data": {
             "pattern": state.pattern,
-            "duration": 800
+            "duration": 800  # ms per tile
         }
     })
     
-    # After pattern shown, enter memorizing phase
-    await asyncio.sleep(pattern_length * 1.2 + 1)
-    state.game_phase = "memorizing"
+    # After pattern is shown, game starts
+    await asyncio.sleep(pattern_length * 1.2 + 1)  # Wait for pattern + buffer
     
     await broadcast_to_frontends({
-        "event": "memorizing_phase",
+        "event": "player_turn",
         "data": {
-            "pattern": state.pattern,
-            "message": "Now step on the tiles in order! Press START again when done."
+            "message": "Your turn! Step on the tiles in order",
+            "pattern_length": len(state.pattern)
         }
     })
 
 async def handle_player_step(data: dict):
-    """Player stepped on a tile"""
-    tile_id = data["tile_id"]
-    
-    if state.game_phase != "memorizing":
-        print(f"  Step ignored (wrong phase: {state.game_phase})")
+    """Handle player stepping on a tile"""
+    if not state.game_active:
         return
     
-    print(f"  Player stepped: Tile {tile_id}")
+    tile_id = data["tile_id"]
+    expected = state.pattern[state.player_progress]
     
-    # Record step
-    state.player_steps.append(tile_id)
+    print(f"  Step: {tile_id}, Expected: {expected}")
     
-    # Send to frontend to show
+    if tile_id == expected:
+        # Correct!
+        state.player_progress += 1
+        state.round_score += 10
+        
+        await broadcast_to_frontends({
+            "event": "step_correct",
+            "data": {
+                "tile_id": tile_id,
+                "progress": state.player_progress,
+                "total": len(state.pattern),
+                "score": state.round_score
+            }
+        })
+        
+        # Check if pattern complete
+        if state.player_progress >= len(state.pattern):
+            await round_complete()
+    else:
+        # Wrong!
+        state.round_score = max(0, state.round_score - 15)
+        
+        await broadcast_to_frontends({
+            "event": "step_incorrect",
+            "data": {
+                "tile_id": tile_id,
+                "expected": expected,
+                "score": state.round_score
+            }
+        })
+        
+        # End game
+        await end_game()
+
+async def round_complete():
+    """Player completed the pattern"""
+    print("✓ Round complete!")
+    
     await broadcast_to_frontends({
-        "event": "player_stepped",
+        "event": "round_complete",
         "data": {
-            "tile_id": tile_id,
-            "step_number": len(state.player_steps),
-            "steps_so_far": state.player_steps
+            "score": state.round_score,
+            "message": "Perfect! Next round..."
         }
     })
     
-    # Tell master to light up tile
+    # Wait a bit
+    await asyncio.sleep(2)
+    
+    # Start next round with longer pattern
+    connected_tiles = [tid for tid, info in state.tiles.items() if info["connected"]]
+    state.pattern = [random.choice(connected_tiles) for _ in range(len(state.pattern) + 1)]
+    state.player_progress = 0
+    
+    print(f"  New pattern: {state.pattern}")
+    
+    # Show pattern
     await state.master_ws.send_json({
-        "event": "light_tile",
+        "event": "show_pattern",
+        "data": {"pattern": state.pattern}
+    })
+    
+    await broadcast_to_frontends({
+        "event": "new_round",
         "data": {
-            "tile_id": tile_id,
-            "on": True
+            "pattern_length": len(state.pattern),
+            "message": "Watch carefully!"
         }
     })
 
-async def check_pattern():
-    """Check if player's pattern is correct"""
-    print("→ Checking pattern...")
-    state.game_phase = "checking"
+async def end_game():
+    """End the current game"""
+    if not state.game_active:
+        return
     
-    # Turn off all tiles
-    await state.master_ws.send_json({
-        "event": "end_game",
-        "data": {}
-    })
-    
-    # Check correctness
-    correct = state.player_steps == state.pattern
-    
-    if correct:
-        state.current_score = len(state.pattern) * 10
-        if state.current_score > state.high_score:
-            state.high_score = state.current_score
-        
-        print(f"✓ CORRECT! Score: {state.current_score}")
-        
-        await broadcast_to_frontends({
-            "event": "pattern_correct",
-            "data": {
-                "message": "Perfect! You got it right! 🎉",
-                "score": state.current_score,
-                "pattern": state.pattern,
-                "player_steps": state.player_steps
-            }
-        })
-    else:
-        print(f"✗ WRONG! Expected: {state.pattern}, Got: {state.player_steps}")
-        
-        await broadcast_to_frontends({
-            "event": "pattern_wrong",
-            "data": {
-                "message": "Oops! That's not quite right.",
-                "expected": state.pattern,
-                "player_steps": state.player_steps,
-                "score": 0
-            }
-        })
-    
-    # Update stats
+    state.game_active = False
     state.games_played += 1
     
-    # Wait then reset
-    await asyncio.sleep(3)
-    state.game_phase = "idle"
-    state.player_steps = []
-    state.pattern = []
+    if state.round_score > state.high_score:
+        state.high_score = state.round_score
     
+    print(f"✓ Game ended - Score: {state.round_score}")
+    
+    # Turn off all tiles
+    if state.master_ws:
+        await state.master_ws.send_json({
+            "event": "end_game",
+            "data": {}
+        })
+    
+    # Notify frontends
     await broadcast_to_frontends({
         "event": "game_ended",
         "data": {
-            "score": state.current_score,
+            "score": state.round_score,
             "high_score": state.high_score,
             "games_played": state.games_played
         }
