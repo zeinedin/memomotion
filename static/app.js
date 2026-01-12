@@ -1,535 +1,727 @@
-// Memory XXL - Frontend Application
+// ============================================
+// MEMORY XXL - GAME APPLICATION
+// Dynamic Tiles based on connected ESP32 devices
+// ============================================
 
-// ==================== CONFIGURATION ====================
-const API_URL = window.location.origin;
-const WS_PROTOCOL = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const WS_URL = `${WS_PROTOCOL}//${window.location.host}/ws/frontend`;
-
-console.log('API URL:', API_URL);
-console.log('WebSocket URL:', WS_URL);
-
-// ==================== STATE ====================
-let ws = null;
-let gameState = {
+// Game State
+const gameState = {
   teamName: '',
   level: 'easy',
+  score: 0,
+  round: 0,
   pattern: [],
   playerSteps: [],
-  currentScore: 0,
-  roundNumber: 0,
-  gamePhase: 'idle',
   connectedTiles: [],
+  expectedTiles: 0,
+  masterConnected: false,
+  isPlaying: false,
 };
 
-const levelConfig = {
-  easy: { patternLength: 4, pointsPerTile: 10, name: 'Easy' },
-  medium: { patternLength: 6, pointsPerTile: 15, name: 'Medium' },
-  hard: { patternLength: 8, pointsPerTile: 25, name: 'Hard' },
+// Level Configuration
+const LEVEL_CONFIG = {
+  easy: { steps: 4, pointsPerRound: 10, label: 'Easy Mode' },
+  medium: { steps: 6, pointsPerRound: 15, label: 'Medium Mode' },
+  hard: { steps: 8, pointsPerRound: 25, label: 'Hard Mode' },
 };
 
-// ==================== DOM ELEMENTS ====================
-const screens = {
-  start: document.getElementById('startScreen'),
-  game: document.getElementById('gameScreen'),
-  leaderboard: document.getElementById('leaderboardScreen'),
-  gameOver: document.getElementById('gameOverScreen'),
-};
+// WebSocket connection
+let socket = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 10;
 
-// ==================== INITIALIZATION ====================
+// DOM Elements cache
+const elements = {};
+
+// ============================================
+// INITIALIZATION
+// ============================================
+
 document.addEventListener('DOMContentLoaded', () => {
-  initEventListeners();
+  cacheElements();
+  setupEventListeners();
   connectWebSocket();
   loadLeaderboard();
 });
 
-function initEventListeners() {
-  // Level selector
-  document.querySelectorAll('.level-btn').forEach((btn) => {
+function cacheElements() {
+  // Screens
+  elements.startScreen = document.getElementById('startScreen');
+  elements.gameScreen = document.getElementById('gameScreen');
+  elements.leaderboardScreen = document.getElementById('leaderboardScreen');
+  elements.gameOverScreen = document.getElementById('gameOverScreen');
+
+  // Start screen
+  elements.teamNameInput = document.getElementById('teamName');
+  elements.levelBtns = document.querySelectorAll('.level-btn');
+  elements.startGameBtn = document.getElementById('startGameBtn');
+  elements.viewLeaderboardBtn = document.getElementById('viewLeaderboardBtn');
+  elements.leaderboardPreview = document.getElementById('leaderboardPreview');
+
+  // Game screen
+  elements.currentTeamName = document.getElementById('currentTeamName');
+  elements.currentLevel = document.getElementById('currentLevel');
+  elements.currentScore = document.getElementById('currentScore');
+  elements.roundNumber = document.getElementById('roundNumber');
+  elements.backToStartBtn = document.getElementById('backToStartBtn');
+  elements.masterDot = document.getElementById('masterDot');
+  elements.masterStatus = document.getElementById('masterStatus');
+  elements.tilesDot = document.getElementById('tilesDot');
+  elements.tilesStatus = document.getElementById('tilesStatus');
+  elements.messageIcon = document.getElementById('messageIcon');
+  elements.messageText = document.getElementById('messageText');
+  elements.tileGrid = document.getElementById('tileGrid');
+  elements.sequenceSection = document.getElementById('sequenceSection');
+  elements.sequenceGrid = document.getElementById('sequenceGrid');
+  elements.stepsSection = document.getElementById('stepsSection');
+  elements.stepsGrid = document.getElementById('stepsGrid');
+
+  // Leaderboard screen
+  elements.leaderboardFull = document.getElementById('leaderboardFull');
+  elements.backFromLeaderboardBtn = document.getElementById(
+    'backFromLeaderboardBtn'
+  );
+
+  // Game over screen
+  elements.gameOverTitle = document.getElementById('gameOverTitle');
+  elements.finalScore = document.getElementById('finalScore');
+  elements.finalRounds = document.getElementById('finalRounds');
+  elements.finalLevel = document.getElementById('finalLevel');
+  elements.playAgainBtn = document.getElementById('playAgainBtn');
+  elements.backToMenuBtn = document.getElementById('backToMenuBtn');
+}
+
+function setupEventListeners() {
+  // Level selection
+  elements.levelBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
-      document
-        .querySelectorAll('.level-btn')
-        .forEach((b) => b.classList.remove('active'));
+      elements.levelBtns.forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       gameState.level = btn.dataset.level;
     });
   });
 
-  // Start game button
-  document.getElementById('startGameBtn').addEventListener('click', startGame);
-
   // Navigation buttons
-  document
-    .getElementById('viewLeaderboardBtn')
-    .addEventListener('click', () => showScreen('leaderboard'));
-  document
-    .getElementById('backFromLeaderboardBtn')
-    .addEventListener('click', () => showScreen('start'));
-  document.getElementById('backToStartBtn').addEventListener('click', () => {
-    if (confirm('Weet je zeker dat je wilt stoppen?')) {
-      showScreen('start');
-    }
-  });
+  elements.startGameBtn.addEventListener('click', startGame);
+  elements.viewLeaderboardBtn.addEventListener('click', () =>
+    showScreen('leaderboard')
+  );
+  elements.backToStartBtn.addEventListener('click', confirmExit);
+  elements.backFromLeaderboardBtn.addEventListener('click', () =>
+    showScreen('start')
+  );
+  elements.playAgainBtn.addEventListener('click', playAgain);
+  elements.backToMenuBtn.addEventListener('click', () => showScreen('start'));
 
-  // Game over buttons
-  document.getElementById('playAgainBtn').addEventListener('click', () => {
-    showScreen('game');
-    resetGameState();
+  // Enter key for team name
+  elements.teamNameInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') startGame();
   });
-  document
-    .getElementById('backToMenuBtn')
-    .addEventListener('click', () => showScreen('start'));
 }
 
-// ==================== SCREEN MANAGEMENT ====================
-function showScreen(screenName) {
-  Object.values(screens).forEach((screen) => screen.classList.remove('active'));
-  screens[screenName].classList.add('active');
+// ============================================
+// SCREEN NAVIGATION
+// ============================================
 
-  if (screenName === 'leaderboard') {
+function showScreen(screen) {
+  const screens = ['start', 'game', 'leaderboard', 'gameOver'];
+  screens.forEach((s) => {
+    const el = document.getElementById(`${s}Screen`);
+    if (el) el.classList.remove('active');
+  });
+
+  const targetScreen = document.getElementById(`${screen}Screen`);
+  if (targetScreen) {
+    targetScreen.classList.add('active');
+  }
+
+  if (screen === 'leaderboard') {
     loadFullLeaderboard();
   }
 }
 
-// ==================== WEBSOCKET ====================
-function connectWebSocket() {
-  ws = new WebSocket(WS_URL);
-
-  ws.onopen = () => {
-    console.log('✓ WebSocket connected');
-    updateConnectionStatus(true);
-  };
-
-  ws.onmessage = (event) => {
-    const msg = JSON.parse(event.data);
-    handleWebSocketMessage(msg);
-  };
-
-  ws.onclose = () => {
-    console.log('✗ WebSocket disconnected');
-    updateConnectionStatus(false);
-    setTimeout(connectWebSocket, 3000);
-  };
-
-  ws.onerror = (error) => {
-    console.error('WebSocket error:', error);
-  };
+function confirmExit() {
+  if (gameState.isPlaying) {
+    if (confirm('Are you sure you want to quit? Your progress will be lost!')) {
+      resetGame();
+      showScreen('start');
+    }
+  } else {
+    showScreen('start');
+  }
 }
 
-function handleWebSocketMessage(msg) {
-  console.log('← Received:', msg.event);
+// ============================================
+// WEBSOCKET CONNECTION
+// ============================================
 
-  switch (msg.event) {
-    case 'initial_state':
-      updateMasterStatus(msg.data.master_connected);
+function connectWebSocket() {
+  const wsUrl = `ws://${window.location.host}/ws/frontend`;
+
+  try {
+    socket = new WebSocket(wsUrl);
+
+    socket.onopen = () => {
+      console.log('🔌 WebSocket connected');
+      reconnectAttempts = 0;
+      updateConnectionStatus(true);
+    };
+
+    socket.onclose = () => {
+      console.log('🔌 WebSocket disconnected');
+      updateConnectionStatus(false);
+      attemptReconnect();
+    };
+
+    socket.onerror = (error) => {
+      console.error('❌ WebSocket error:', error);
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        handleWebSocketMessage(message);
+      } catch (e) {
+        console.error('❌ Failed to parse message:', e);
+      }
+    };
+  } catch (error) {
+    console.error('❌ Failed to create WebSocket:', error);
+    attemptReconnect();
+  }
+}
+
+function attemptReconnect() {
+  if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+    reconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+    console.log(
+      `🔄 Reconnecting in ${
+        delay / 1000
+      }s (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`
+    );
+    setTimeout(connectWebSocket, delay);
+  }
+}
+
+function sendMessage(message) {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify(message));
+  }
+}
+
+// ============================================
+// WEBSOCKET MESSAGE HANDLERS
+// ============================================
+
+function handleWebSocketMessage(message) {
+  console.log('📩 Received:', message);
+
+  switch (message.type) {
+    case 'status':
+      handleStatusUpdate(message);
       break;
-
-    case 'master_status':
-      updateMasterStatus(msg.data.connected);
-      break;
-
     case 'tile_status':
-      updateTileStatus(msg.data);
+      updateTileStatus(message.connected_tiles, message.expected_tiles);
       break;
-
+    case 'tile_connected':
+      handleTileConnected(message.tile_id);
+      break;
+    case 'tile_disconnected':
+      handleTileDisconnected(message.tile_id);
+      break;
+    case 'tile_activated':
+      handleTileActivated(message.tile_id);
+      break;
+    case 'show_pattern':
+      showPattern(message.pattern);
+      break;
+    case 'player_turn':
+      startPlayerTurn(
+        message.expected_count || LEVEL_CONFIG[gameState.level].steps
+      );
+      break;
+    case 'step_received':
+      handleStepReceived(
+        message.tile_id,
+        message.step_number,
+        message.is_correct
+      );
+      break;
+    case 'round_complete':
+      handleRoundComplete(message.round, message.score);
+      break;
+    case 'game_over':
+      handleGameOver(message.final_score, message.rounds);
+      break;
+    case 'waiting_for_start':
+      setMessage('🎮', 'Press the START button on the master to begin!');
+      break;
     case 'game_started':
-      handleGameStarted(msg.data);
-      break;
-
-    case 'pattern_displayed':
-      handlePatternDisplayed(msg.data);
-      break;
-
-    case 'memorizing_phase':
-      handleMemorizingPhase(msg.data);
-      break;
-
-    case 'player_stepped':
-      handlePlayerStep(msg.data);
-      break;
-
-    case 'pattern_correct':
-      handlePatternResult(true, msg.data);
-      break;
-
-    case 'pattern_wrong':
-      handlePatternResult(false, msg.data);
-      break;
-
-    case 'game_ended':
-      handleGameEnded(msg.data);
+      gameState.isPlaying = true;
+      gameState.round = 0;
+      gameState.score = 0;
+      updateGameStats();
+      setMessage('🚀', 'Game Started! Get ready...');
       break;
   }
 }
 
-// ==================== GAME FUNCTIONS ====================
+function handleStatusUpdate(message) {
+  gameState.masterConnected = message.master_connected;
+  updateMasterStatus();
+
+  if (message.connected_tiles) {
+    updateTileStatus(message.connected_tiles, message.expected_tiles || 0);
+  }
+}
+
+function updateConnectionStatus(connected) {
+  if (!connected) {
+    elements.masterDot.classList.remove('connected');
+    elements.masterStatus.textContent = 'Master: Disconnected';
+    elements.tilesDot.classList.remove('connected');
+  }
+}
+
+function updateMasterStatus() {
+  if (gameState.masterConnected) {
+    elements.masterDot.classList.add('connected');
+    elements.masterStatus.textContent = 'Master: Connected';
+  } else {
+    elements.masterDot.classList.remove('connected');
+    elements.masterStatus.textContent = 'Master: Waiting...';
+  }
+}
+
+// ============================================
+// DYNAMIC TILE GRID
+// ============================================
+
+function updateTileStatus(connectedTiles, expectedTiles) {
+  gameState.connectedTiles = connectedTiles || [];
+  gameState.expectedTiles = expectedTiles || gameState.connectedTiles.length;
+
+  // Update status display
+  const connected = gameState.connectedTiles.length;
+  const expected = Math.max(gameState.expectedTiles, connected);
+
+  elements.tilesStatus.textContent = `Tiles: ${connected}/${expected}`;
+
+  if (connected > 0 && connected >= expected) {
+    elements.tilesDot.classList.add('connected');
+  } else if (connected > 0) {
+    elements.tilesDot.classList.remove('connected');
+  } else {
+    elements.tilesDot.classList.remove('connected');
+  }
+
+  // Rebuild the tile grid dynamically
+  buildTileGrid();
+}
+
+function buildTileGrid() {
+  const grid = elements.tileGrid;
+
+  // If no tiles connected, show waiting message
+  if (gameState.connectedTiles.length === 0) {
+    grid.innerHTML = `
+            <div class="no-tiles-message">
+                <span class="no-tiles-icon">📡</span>
+                <p>Waiting for tiles to connect...</p>
+            </div>
+        `;
+    return;
+  }
+
+  // Sort tiles by ID for consistent display
+  const sortedTiles = [...gameState.connectedTiles].sort((a, b) => a - b);
+
+  // Create tile elements dynamically
+  grid.innerHTML = sortedTiles
+    .map(
+      (tileId) => `
+        <div class="tile" data-tile-id="${tileId}" id="tile-${tileId}">
+            <span class="tile-number">${tileId}</span>
+        </div>
+    `
+    )
+    .join('');
+
+  // Adjust grid columns based on tile count
+  const tileCount = sortedTiles.length;
+  let columns = Math.ceil(Math.sqrt(tileCount));
+  if (columns < 2) columns = 2;
+  if (columns > 6) columns = 6;
+
+  grid.style.gridTemplateColumns = `repeat(${columns}, minmax(80px, 1fr))`;
+}
+
+function handleTileConnected(tileId) {
+  if (!gameState.connectedTiles.includes(tileId)) {
+    gameState.connectedTiles.push(tileId);
+    updateTileStatus(gameState.connectedTiles, gameState.expectedTiles);
+  }
+}
+
+function handleTileDisconnected(tileId) {
+  const index = gameState.connectedTiles.indexOf(tileId);
+  if (index > -1) {
+    gameState.connectedTiles.splice(index, 1);
+    updateTileStatus(gameState.connectedTiles, gameState.expectedTiles);
+  }
+}
+
+function handleTileActivated(tileId) {
+  const tile = document.getElementById(`tile-${tileId}`);
+  if (tile) {
+    tile.classList.add('active');
+    setTimeout(() => {
+      tile.classList.remove('active');
+    }, 500);
+  }
+}
+
+// ============================================
+// GAME LOGIC
+// ============================================
+
 function startGame() {
-  const teamName = document.getElementById('teamName').value.trim();
+  const teamName = elements.teamNameInput.value.trim();
 
   if (!teamName) {
-    alert('Voer een teamnaam in!');
+    elements.teamNameInput.focus();
+    elements.teamNameInput.style.borderColor = 'var(--neon-red)';
+    setTimeout(() => {
+      elements.teamNameInput.style.borderColor = '';
+    }, 1000);
     return;
   }
 
   gameState.teamName = teamName;
-  gameState.currentScore = 0;
-  gameState.roundNumber = 0;
-
-  // Update UI
-  document.getElementById('currentTeamName').textContent = teamName;
-  document.getElementById('currentLevel').textContent =
-    levelConfig[gameState.level].name;
-  document.getElementById('currentScore').textContent = '0';
-  document.getElementById('roundNumber').textContent = '0';
-
-  // Send team info to backend
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(
-      JSON.stringify({
-        event: 'start_game',
-        data: {
-          team_name: teamName,
-          level: gameState.level,
-        },
-      })
-    );
-  }
-
-  showScreen('game');
-  resetGameUI();
-  showMessage('Druk op de START knop om te beginnen!');
-}
-
-function resetGameState() {
+  gameState.score = 0;
+  gameState.round = 0;
   gameState.pattern = [];
   gameState.playerSteps = [];
-  gameState.roundNumber = 0;
-  gameState.currentScore = 0;
-  gameState.gamePhase = 'idle';
-  document.getElementById('currentScore').textContent = '0';
-  document.getElementById('roundNumber').textContent = '0';
-  resetGameUI();
-}
 
-function resetGameUI() {
-  // Reset tile grid
-  document.querySelectorAll('.tile-box').forEach((tile) => {
-    tile.classList.remove('highlight', 'active', 'correct', 'wrong', 'stepped');
+  // Update UI
+  elements.currentTeamName.textContent = teamName;
+  elements.currentLevel.textContent = LEVEL_CONFIG[gameState.level].label;
+  updateGameStats();
+
+  // Hide pattern sections initially
+  elements.sequenceSection.classList.remove('visible');
+  elements.stepsSection.classList.remove('visible');
+
+  // Set initial message
+  setMessage('⏳', 'Connecting to game master...');
+
+  // Send game start to backend
+  sendMessage({
+    type: 'start_game',
+    team_name: teamName,
+    level: gameState.level,
   });
 
-  // Hide sections
-  document.getElementById('sequenceSection').classList.remove('show');
-  document.getElementById('stepsSection').classList.remove('show');
-  document.getElementById('sequenceGrid').innerHTML = '';
-  document.getElementById('stepsGrid').innerHTML = '';
+  showScreen('game');
 }
 
-function handleGameStarted(data) {
-  gameState.gamePhase = 'showing_pattern';
-  gameState.pattern = data.pattern;
-  gameState.roundNumber++;
-
-  document.getElementById('roundNumber').textContent = gameState.roundNumber;
-  showMessage('Kijk naar het patroon! 👀');
-
-  // Show pattern on tile grid with animation
-  animatePattern(data.pattern);
-
-  // Show pattern sequence
-  showPatternSequence(data.pattern);
-}
-
-function animatePattern(pattern) {
-  resetGameUI();
-  document.getElementById('sequenceSection').classList.add('show');
-
-  pattern.forEach((tileId, index) => {
-    setTimeout(() => {
-      // Highlight tile in grid
-      const tile = document.querySelector(`.tile-box[data-tile="${tileId}"]`);
-      if (tile) {
-        tile.classList.add('highlight');
-
-        // Remove highlight after a moment
-        setTimeout(() => {
-          tile.classList.remove('highlight');
-          tile.classList.add('active');
-        }, 600);
-      }
-
-      // Fill sequence box
-      const sequenceBoxes = document.querySelectorAll(
-        '#sequenceGrid .sequence-box'
-      );
-      if (sequenceBoxes[index]) {
-        sequenceBoxes[index].classList.add('filled');
-      }
-    }, index * 800);
-  });
-}
-
-function showPatternSequence(pattern) {
-  const grid = document.getElementById('sequenceGrid');
-  grid.innerHTML = '';
-
-  pattern.forEach((tileId, index) => {
-    const box = document.createElement('div');
-    box.className = 'sequence-box';
-    box.innerHTML = `<span class="step-number">${index + 1}</span>`;
-    grid.appendChild(box);
-  });
-}
-
-function handlePatternDisplayed(data) {
-  gameState.pattern = data.pattern;
-  showMessage('Onthoud het patroon!');
-}
-
-function handleMemorizingPhase(data) {
-  gameState.gamePhase = 'memorizing';
+function resetGame() {
+  gameState.isPlaying = false;
+  gameState.score = 0;
+  gameState.round = 0;
+  gameState.pattern = [];
   gameState.playerSteps = [];
 
-  showMessage('Stap op de tegels in de juiste volgorde! 🦶');
+  elements.sequenceSection.classList.remove('visible');
+  elements.stepsSection.classList.remove('visible');
+  elements.sequenceGrid.innerHTML = '';
+  elements.stepsGrid.innerHTML = '';
 
-  document.getElementById('stepsSection').classList.add('show');
-  document.getElementById('stepsGrid').innerHTML = '';
-
-  // Create empty step boxes
-  for (let i = 0; i < gameState.pattern.length; i++) {
-    const box = document.createElement('div');
-    box.className = 'sequence-box';
-    box.innerHTML = `<span class="step-number">${i + 1}</span>`;
-    document.getElementById('stepsGrid').appendChild(box);
-  }
-}
-
-function handlePlayerStep(data) {
-  gameState.playerSteps.push(data.tile_id);
-
-  // Highlight stepped tile in grid
-  const tile = document.querySelector(`.tile-box[data-tile="${data.tile_id}"]`);
-  if (tile) {
-    tile.classList.add('stepped');
-  }
-
-  // Fill step box
-  const stepBoxes = document.querySelectorAll('#stepsGrid .sequence-box');
-  const stepIndex = gameState.playerSteps.length - 1;
-  if (stepBoxes[stepIndex]) {
-    stepBoxes[stepIndex].classList.add('filled');
-  }
-
-  showMessage(
-    `Stap ${gameState.playerSteps.length} van ${gameState.pattern.length}`
-  );
-}
-
-function handlePatternResult(correct, data) {
-  gameState.gamePhase = 'result';
-
-  const stepBoxes = document.querySelectorAll('#stepsGrid .sequence-box');
-  const patternBoxes = document.querySelectorAll('#sequenceGrid .sequence-box');
-
-  if (correct) {
-    // All correct
-    stepBoxes.forEach((box) => box.classList.add('correct'));
-    patternBoxes.forEach((box) => box.classList.add('correct'));
-
-    // Update score
-    const points =
-      gameState.pattern.length * levelConfig[gameState.level].pointsPerTile;
-    gameState.currentScore += points;
-    document.getElementById('currentScore').textContent =
-      gameState.currentScore;
-
-    showMessage('🎉 Perfect! +' + points + ' punten!', 'success');
-
-    // Save score to leaderboard
-    saveScore();
-  } else {
-    // Show which were wrong
-    data.player_steps.forEach((stepId, index) => {
-      if (stepBoxes[index]) {
-        if (stepId === data.expected[index]) {
-          stepBoxes[index].classList.add('correct');
-        } else {
-          stepBoxes[index].classList.add('wrong');
-        }
-      }
-    });
-
-    showMessage('❌ Fout! Probeer opnieuw!', 'error');
-  }
-}
-
-function handleGameEnded(data) {
-  // Show game over screen after a delay
-  setTimeout(() => {
-    document.getElementById('finalScore').textContent = gameState.currentScore;
-    document.getElementById('finalRounds').textContent = gameState.roundNumber;
-    document.getElementById('finalLevel').textContent =
-      levelConfig[gameState.level].name;
-
-    if (gameState.currentScore > 0) {
-      document.getElementById('gameOverTitle').textContent =
-        '🎉 Goed gespeeld!';
-    } else {
-      document.getElementById('gameOverTitle').textContent = 'Spel Voorbij!';
-    }
-
-    showScreen('gameOver');
-  }, 2000);
-}
-
-// ==================== UI UPDATES ====================
-function showMessage(text, type = '') {
-  const messageEl = document.getElementById('gameMessage');
-  const textEl = document.getElementById('messageText');
-
-  textEl.textContent = text;
-  messageEl.className = 'game-message ' + type;
-  messageEl.style.animation = 'none';
-  messageEl.offsetHeight; // Trigger reflow
-  messageEl.style.animation = 'slideIn 0.3s ease-out';
-}
-
-function updateConnectionStatus(connected) {
-  // Update UI based on websocket connection
-}
-
-function updateMasterStatus(connected) {
-  const dot = document.getElementById('masterDot');
-  const status = document.getElementById('masterStatus');
-
-  if (connected) {
-    dot.classList.add('connected');
-    status.textContent = 'Master: Verbonden';
-  } else {
-    dot.classList.remove('connected');
-    status.textContent = 'Master: Niet verbonden';
-  }
-}
-
-function updateTileStatus(data) {
-  const dot = document.getElementById('tilesDot');
-  const status = document.getElementById('tilesStatus');
-
-  gameState.connectedTiles = Object.entries(data.tiles || {})
-    .filter(([id, info]) => info.connected)
-    .map(([id]) => parseInt(id));
-
-  status.textContent = `Tegels: ${data.connected}/${data.total}`;
-
-  if (data.connected > 0) {
-    dot.classList.add('connected');
-  } else {
-    dot.classList.remove('connected');
-  }
-
-  // Update tile grid to show connected tiles
-  document.querySelectorAll('.tile-box').forEach((tile) => {
-    const tileId = parseInt(tile.dataset.tile);
-    if (gameState.connectedTiles.includes(tileId)) {
-      tile.classList.add('active');
-    } else {
-      tile.classList.remove('active');
-    }
+  // Clear tile states
+  document.querySelectorAll('.tile').forEach((tile) => {
+    tile.classList.remove('active', 'pattern', 'step', 'correct', 'wrong');
   });
 }
 
-// ==================== LEADERBOARD ====================
+function playAgain() {
+  resetGame();
+  sendMessage({
+    type: 'start_game',
+    team_name: gameState.teamName,
+    level: gameState.level,
+  });
+  showScreen('game');
+}
+
+function updateGameStats() {
+  elements.currentScore.textContent = gameState.score;
+  elements.roundNumber.textContent = gameState.round;
+}
+
+function setMessage(icon, text) {
+  elements.messageIcon.textContent = icon;
+  elements.messageText.textContent = text;
+}
+
+// ============================================
+// PATTERN DISPLAY
+// ============================================
+
+function showPattern(pattern) {
+  gameState.pattern = pattern;
+  setMessage('🧠', 'Watch the pattern carefully!');
+
+  // Show sequence section
+  elements.sequenceSection.classList.add('visible');
+  elements.stepsSection.classList.remove('visible');
+  elements.sequenceGrid.innerHTML = '';
+
+  // Clear previous tile highlights
+  document.querySelectorAll('.tile').forEach((tile) => {
+    tile.classList.remove('pattern', 'step', 'correct', 'wrong');
+  });
+
+  // Animate pattern display
+  let delay = 0;
+  pattern.forEach((tileId, index) => {
+    setTimeout(() => {
+      // Add to sequence grid
+      const box = document.createElement('div');
+      box.className = 'sequence-box';
+      box.textContent = index + 1;
+      elements.sequenceGrid.appendChild(box);
+
+      // Highlight tile on grid
+      const tile = document.getElementById(`tile-${tileId}`);
+      if (tile) {
+        tile.classList.add('pattern');
+        setTimeout(() => {
+          tile.classList.remove('pattern');
+        }, 600);
+      }
+    }, delay);
+    delay += 800;
+  });
+}
+
+// ============================================
+// PLAYER TURN
+// ============================================
+
+function startPlayerTurn(expectedCount) {
+  gameState.playerSteps = [];
+  setMessage('👟', `Your turn! Repeat the pattern (${expectedCount} steps)`);
+
+  // Show steps section
+  elements.stepsSection.classList.add('visible');
+  elements.stepsGrid.innerHTML = '';
+
+  // Add waiting placeholders
+  for (let i = 0; i < expectedCount; i++) {
+    const box = document.createElement('div');
+    box.className = 'step-box waiting';
+    box.textContent = i + 1;
+    elements.stepsGrid.appendChild(box);
+  }
+}
+
+function handleStepReceived(tileId, stepNumber, isCorrect) {
+  gameState.playerSteps.push(tileId);
+
+  const tile = document.getElementById(`tile-${tileId}`);
+
+  // Update step display
+  const stepBoxes = elements.stepsGrid.querySelectorAll('.step-box');
+  if (stepBoxes[stepNumber - 1]) {
+    stepBoxes[stepNumber - 1].classList.remove('waiting');
+    if (!isCorrect) {
+      stepBoxes[stepNumber - 1].style.background = 'var(--gradient-danger)';
+    }
+  }
+
+  // Animate tile
+  if (tile) {
+    if (isCorrect) {
+      tile.classList.add('step', 'correct');
+      setTimeout(() => {
+        tile.classList.remove('correct');
+      }, 500);
+    } else {
+      tile.classList.add('wrong');
+    }
+  }
+
+  // Update message
+  if (isCorrect) {
+    setMessage('✅', `Step ${stepNumber} correct!`);
+  } else {
+    setMessage('❌', `Wrong step! Game Over!`);
+  }
+}
+
+// ============================================
+// ROUND COMPLETION
+// ============================================
+
+function handleRoundComplete(round, score) {
+  gameState.round = round;
+  gameState.score = score;
+  updateGameStats();
+
+  setMessage(
+    '🎉',
+    `Round ${round} Complete! +${
+      LEVEL_CONFIG[gameState.level].pointsPerRound
+    } points!`
+  );
+
+  // Clear tile states after a moment
+  setTimeout(() => {
+    document.querySelectorAll('.tile').forEach((tile) => {
+      tile.classList.remove('step', 'pattern', 'correct');
+    });
+    elements.sequenceSection.classList.remove('visible');
+    elements.stepsSection.classList.remove('visible');
+  }, 1500);
+}
+
+// ============================================
+// GAME OVER
+// ============================================
+
+function handleGameOver(finalScore, rounds) {
+  gameState.isPlaying = false;
+  gameState.score = finalScore;
+  gameState.round = rounds;
+
+  // Update game over screen
+  elements.finalScore.textContent = finalScore;
+  elements.finalRounds.textContent = rounds;
+  elements.finalLevel.textContent = LEVEL_CONFIG[gameState.level].label.replace(
+    ' Mode',
+    ''
+  );
+
+  // Set title based on score
+  if (finalScore >= 100) {
+    elements.gameOverTitle.innerHTML =
+      '<span class="title-icon">🏆</span> INCREDIBLE!';
+  } else if (finalScore >= 50) {
+    elements.gameOverTitle.innerHTML =
+      '<span class="title-icon">⭐</span> GREAT JOB!';
+  } else if (finalScore > 0) {
+    elements.gameOverTitle.innerHTML =
+      '<span class="title-icon">👍</span> NICE TRY!';
+  } else {
+    elements.gameOverTitle.innerHTML =
+      '<span class="title-icon">🎮</span> GAME OVER';
+  }
+
+  // Submit score
+  submitScore(gameState.teamName, finalScore, gameState.level, rounds);
+
+  showScreen('gameOver');
+}
+
+// ============================================
+// LEADERBOARD
+// ============================================
+
 async function loadLeaderboard() {
   try {
-    const response = await fetch(`${API_URL}/api/leaderboard?limit=5`);
-    if (response.ok) {
-      const data = await response.json();
-      renderLeaderboardPreview(data.leaderboard);
-    }
+    const response = await fetch('/api/leaderboard?limit=5');
+    const data = await response.json();
+    renderLeaderboard(elements.leaderboardPreview, data, true);
   } catch (error) {
-    console.error('Error loading leaderboard:', error);
-    document.getElementById('leaderboardPreview').innerHTML =
-      '<div class="loading">Kon leaderboard niet laden</div>';
+    console.error('Failed to load leaderboard:', error);
+    elements.leaderboardPreview.innerHTML =
+      '<p class="empty-leaderboard">Unable to load leaderboard</p>';
   }
 }
 
 async function loadFullLeaderboard() {
   try {
-    const response = await fetch(`${API_URL}/api/leaderboard?limit=50`);
-    if (response.ok) {
-      const data = await response.json();
-      renderFullLeaderboard(data.leaderboard);
-    }
+    elements.leaderboardFull.innerHTML =
+      '<div class="loading-spinner"><div class="spinner"></div><span>Loading...</span></div>';
+    const response = await fetch('/api/leaderboard?limit=50');
+    const data = await response.json();
+    renderLeaderboard(elements.leaderboardFull, data, false);
   } catch (error) {
-    console.error('Error loading leaderboard:', error);
-    document.getElementById('leaderboardFull').innerHTML =
-      '<div class="loading">Kon leaderboard niet laden</div>';
+    console.error('Failed to load full leaderboard:', error);
+    elements.leaderboardFull.innerHTML =
+      '<p class="empty-leaderboard">Unable to load leaderboard</p>';
   }
 }
 
-function renderLeaderboardPreview(entries) {
-  const container = document.getElementById('leaderboardPreview');
-
+function renderLeaderboard(container, entries, isPreview) {
   if (!entries || entries.length === 0) {
-    container.innerHTML = '<div class="loading">Nog geen scores!</div>';
+    container.innerHTML =
+      '<p class="empty-leaderboard">No scores yet! Be the first to play!</p>';
     return;
   }
 
   container.innerHTML = entries
-    .map((entry, index) => createLeaderboardItem(entry, index))
-    .join('');
-}
+    .map((entry, index) => {
+      const rank = index + 1;
+      let rankClass = '';
+      let itemClass = '';
 
-function renderFullLeaderboard(entries) {
-  const container = document.getElementById('leaderboardFull');
+      if (rank === 1) {
+        rankClass = 'top-1';
+        itemClass = 'gold';
+      } else if (rank === 2) {
+        rankClass = 'top-2';
+        itemClass = 'silver';
+      } else if (rank === 3) {
+        rankClass = 'top-3';
+        itemClass = 'bronze';
+      }
 
-  if (!entries || entries.length === 0) {
-    container.innerHTML = '<div class="loading">Nog geen scores!</div>';
-    return;
-  }
+      const medal =
+        rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
 
-  container.innerHTML = entries
-    .map((entry, index) => createLeaderboardItem(entry, index))
-    .join('');
-}
-
-function createLeaderboardItem(entry, index) {
-  let rankClass = '';
-  if (index === 0) rankClass = 'gold';
-  else if (index === 1) rankClass = 'silver';
-  else if (index === 2) rankClass = 'bronze';
-
-  return `
-        <div class="leaderboard-item ${rankClass}">
-            <div class="rank ${rankClass}">${index + 1}</div>
-            <div class="team-details">
-                <div class="team-name-lb">${escapeHtml(entry.team_name)}</div>
-                <div class="team-level-lb">${entry.level}</div>
+      return `
+            <div class="leaderboard-item ${itemClass}">
+                <span class="rank ${rankClass}">${medal}</span>
+                <div class="team-info">
+                    <span class="team-name">${escapeHtml(
+                      entry.team_name
+                    )}</span>
+                    <span class="team-meta">${entry.level.toUpperCase()} • ${
+        entry.rounds
+      } rounds</span>
+                </div>
+                <span class="team-score">${entry.score}</span>
             </div>
-            <div class="team-score">${entry.score}</div>
-        </div>
-    `;
+        `;
+    })
+    .join('');
 }
 
-async function saveScore() {
-  if (gameState.currentScore <= 0) return;
-
+async function submitScore(teamName, score, level, rounds) {
   try {
-    await fetch(`${API_URL}/api/leaderboard`, {
+    await fetch('/api/leaderboard', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        team_name: gameState.teamName,
-        score: gameState.currentScore,
-        level: gameState.level,
-        rounds: gameState.roundNumber,
+        team_name: teamName,
+        score: score,
+        level: level,
+        rounds: rounds,
       }),
     });
-    console.log('Score saved!');
+
+    // Refresh leaderboard preview
+    loadLeaderboard();
   } catch (error) {
-    console.error('Error saving score:', error);
+    console.error('Failed to submit score:', error);
   }
 }
 
-// ==================== UTILITIES ====================
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
+
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;

@@ -4,60 +4,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Memory XXL</title>
+    <title>Memory XXL - The Game</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
 </head>
 
 <body>
+    <!-- Animated Background -->
+    <div class="bg-animation">
+        <div class="stars"></div>
+        <div class="stars2"></div>
+        <div class="stars3"></div>
+    </div>
+
     <!-- START SCREEN -->
     <div id="startScreen" class="screen active">
         <div class="container">
-            <header>
-                <h1 class="title">MEMORY XXL</h1>
-                <p class="subtitle">Test je geheugen!</p>
+            <header class="hero">
+                <div class="logo-container">
+                    <div class="logo-glow"></div>
+                    <h1 class="logo">MEMORY<span class="logo-xxl">XXL</span></h1>
+                </div>
+                <p class="tagline">🧠 Test Your Memory • Beat The Challenge 🎮</p>
             </header>
 
-            <div class="registration-card">
-                <h2>Team Registratie</h2>
-
-                <div class="form-group">
-                    <label for="teamName">Team Naam</label>
-                    <input type="text" id="teamName" placeholder="Voer je teamnaam in..." maxlength="20">
+            <div class="card glass-card registration-card">
+                <div class="card-header">
+                    <span class="card-icon">👥</span>
+                    <h2>Team Setup</h2>
                 </div>
 
                 <div class="form-group">
-                    <label>Kies Niveau</label>
+                    <label for="teamName">
+                        <span class="label-icon">🏷️</span> Team Naam
+                    </label>
+                    <div class="input-wrapper">
+                        <input type="text" id="teamName" placeholder="Enter your team name..." maxlength="20">
+                        <span class="input-focus-effect"></span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <span class="label-icon">⚡</span> Difficulty Level
+                    </label>
                     <div class="level-selector">
                         <button class="level-btn active" data-level="easy">
-                            <span class="level-icon">🌱</span>
-                            <span class="level-name">Easy</span>
-                            <span class="level-desc">4 tegels</span>
+                            <div class="level-glow"></div>
+                            <span class="level-icon">🌟</span>
+                            <div class="level-info">
+                                <span class="level-name">EASY</span>
+                                <span class="level-desc">4 Steps</span>
+                            </div>
+                            <span class="level-multiplier">1x</span>
                         </button>
                         <button class="level-btn" data-level="medium">
+                            <div class="level-glow"></div>
                             <span class="level-icon">🔥</span>
-                            <span class="level-name">Medium</span>
-                            <span class="level-desc">6 tegels</span>
+                            <div class="level-info">
+                                <span class="level-name">MEDIUM</span>
+                                <span class="level-desc">6 Steps</span>
+                            </div>
+                            <span class="level-multiplier">1.5x</span>
                         </button>
                         <button class="level-btn" data-level="hard">
+                            <div class="level-glow"></div>
                             <span class="level-icon">💀</span>
-                            <span class="level-name">Hard</span>
-                            <span class="level-desc">8 tegels</span>
+                            <div class="level-info">
+                                <span class="level-name">HARD</span>
+                                <span class="level-desc">8 Steps</span>
+                            </div>
+                            <span class="level-multiplier">2.5x</span>
                         </button>
                     </div>
                 </div>
 
-                <button id="startGameBtn" class="btn btn-primary btn-large">
-                    START SPEL
+                <button id="startGameBtn" class="btn btn-play">
+                    <span class="btn-bg"></span>
+                    <span class="btn-text">🎮 START GAME</span>
                 </button>
             </div>
 
-            <div class="leaderboard-preview">
-                <h3>🏆 Top 5 Teams</h3>
+            <div class="card glass-card leaderboard-card">
+                <div class="card-header">
+                    <span class="card-icon">🏆</span>
+                    <h2>Leaderboard</h2>
+                </div>
                 <div id="leaderboardPreview" class="leaderboard-list">
-                    <div class="loading">Laden...</div>
+                    <div class="loading-spinner">
+                        <div class="spinner"></div>
+                        <span>Loading...</span>
+                    </div>
                 </div>
                 <button id="viewLeaderboardBtn" class="btn btn-secondary">
-                    Bekijk Volledig Leaderboard
+                    View All Rankings →
                 </button>
             </div>
         </div>
@@ -67,72 +110,81 @@
     <div id="gameScreen" class="screen">
         <div class="container">
             <header class="game-header">
-                <div class="team-info">
-                    <span class="team-name" id="currentTeamName">Team</span>
-                    <span class="team-level" id="currentLevel">Easy</span>
+                <div class="player-info">
+                    <div class="player-avatar">👤</div>
+                    <div class="player-details">
+                        <span class="player-name" id="currentTeamName">Team</span>
+                        <span class="player-level" id="currentLevel">Easy Mode</span>
+                    </div>
                 </div>
-                <button id="backToStartBtn" class="btn btn-small btn-secondary">← Terug</button>
+                <button id="backToStartBtn" class="btn btn-icon">
+                    <span>✕</span>
+                </button>
             </header>
 
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-value" id="currentScore">0</div>
-                    <div class="stat-label">Score</div>
+            <div class="game-stats">
+                <div class="stat-box score-box">
+                    <div class="stat-icon">⭐</div>
+                    <div class="stat-content">
+                        <span class="stat-value" id="currentScore">0</span>
+                        <span class="stat-label">SCORE</span>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="roundNumber">0</div>
-                    <div class="stat-label">Ronde</div>
+                <div class="stat-box round-box">
+                    <div class="stat-icon">🎯</div>
+                    <div class="stat-content">
+                        <span class="stat-value" id="roundNumber">0</span>
+                        <span class="stat-label">ROUND</span>
+                    </div>
                 </div>
             </div>
 
-            <div class="status-card">
+            <div class="connection-status">
                 <div class="status-item">
-                    <span class="status-dot" id="masterDot"></span>
-                    <span id="masterStatus">Master: Verbinden...</span>
+                    <span class="status-indicator" id="masterDot"></span>
+                    <span id="masterStatus">Master: Connecting...</span>
                 </div>
                 <div class="status-item">
-                    <span class="status-dot" id="tilesDot"></span>
-                    <span id="tilesStatus">Tegels: 0/0</span>
+                    <span class="status-indicator" id="tilesDot"></span>
+                    <span id="tilesStatus">Tiles: 0/0</span>
                 </div>
             </div>
 
-            <div class="game-message" id="gameMessage">
-                <div class="message-text" id="messageText">Druk op START knop om te beginnen!</div>
+            <div class="game-message-container" id="gameMessage">
+                <div class="message-icon" id="messageIcon">🎮</div>
+                <div class="message-text" id="messageText">Press START button to begin!</div>
             </div>
 
-            <!-- PATTERN DISPLAY - Visual Grid -->
-            <div class="pattern-section" id="patternSection">
-                <h3 class="section-title" id="patternTitle">Het Patroon</h3>
+            <!-- DYNAMIC TILE GRID - Generated by JS based on connected tiles -->
+            <div class="card glass-card game-arena">
+                <h3 class="arena-title">
+                    <span class="arena-icon">🎯</span>
+                    Game Arena
+                </h3>
                 <div class="tile-grid" id="tileGrid">
-                    <!-- 4x4 grid of tiles -->
-                    <div class="tile-box" data-tile="1"></div>
-                    <div class="tile-box" data-tile="2"></div>
-                    <div class="tile-box" data-tile="3"></div>
-                    <div class="tile-box" data-tile="4"></div>
-                    <div class="tile-box" data-tile="5"></div>
-                    <div class="tile-box" data-tile="6"></div>
-                    <div class="tile-box" data-tile="7"></div>
-                    <div class="tile-box" data-tile="8"></div>
-                    <div class="tile-box" data-tile="9"></div>
-                    <div class="tile-box" data-tile="10"></div>
-                    <div class="tile-box" data-tile="11"></div>
-                    <div class="tile-box" data-tile="12"></div>
-                    <div class="tile-box" data-tile="13"></div>
-                    <div class="tile-box" data-tile="14"></div>
-                    <div class="tile-box" data-tile="15"></div>
-                    <div class="tile-box" data-tile="16"></div>
+                    <!-- Tiles will be dynamically generated -->
+                    <div class="no-tiles-message">
+                        <span class="no-tiles-icon">📡</span>
+                        <p>Waiting for tiles to connect...</p>
+                    </div>
                 </div>
             </div>
 
-            <!-- PATTERN SEQUENCE (visual boxes showing order) -->
-            <div class="sequence-section" id="sequenceSection">
-                <h3 class="section-title">Patroon Volgorde</h3>
+            <!-- PATTERN SEQUENCE -->
+            <div class="card glass-card sequence-card" id="sequenceSection">
+                <h3 class="section-title">
+                    <span class="section-icon">🧠</span>
+                    Pattern to Remember
+                </h3>
                 <div class="sequence-grid" id="sequenceGrid"></div>
             </div>
 
             <!-- PLAYER STEPS -->
-            <div class="steps-section" id="stepsSection">
-                <h3 class="section-title">Jouw Stappen</h3>
+            <div class="card glass-card steps-card" id="stepsSection">
+                <h3 class="section-title">
+                    <span class="section-icon">👟</span>
+                    Your Steps
+                </h3>
                 <div class="sequence-grid" id="stepsGrid"></div>
             </div>
         </div>
@@ -141,17 +193,22 @@
     <!-- LEADERBOARD SCREEN -->
     <div id="leaderboardScreen" class="screen">
         <div class="container">
-            <header>
-                <h1 class="title">🏆 LEADERBOARD</h1>
-                <p class="subtitle">De beste teams</p>
+            <header class="hero small">
+                <h1 class="page-title">🏆 HALL OF FAME</h1>
+                <p class="tagline">Top Memory Champions</p>
             </header>
 
-            <div class="leaderboard-full" id="leaderboardFull">
-                <div class="loading">Laden...</div>
+            <div class="card glass-card">
+                <div id="leaderboardFull" class="leaderboard-list full">
+                    <div class="loading-spinner">
+                        <div class="spinner"></div>
+                        <span>Loading...</span>
+                    </div>
+                </div>
             </div>
 
             <button id="backFromLeaderboardBtn" class="btn btn-primary">
-                ← Terug naar Start
+                ← Back to Menu
             </button>
         </div>
     </div>
@@ -159,25 +216,48 @@
     <!-- GAME OVER SCREEN -->
     <div id="gameOverScreen" class="screen">
         <div class="container">
-            <div class="game-over-card">
-                <h1 id="gameOverTitle">Spel Voorbij!</h1>
-                <div class="final-score">
-                    <span class="score-label">Eindscore</span>
-                    <span class="score-value" id="finalScore">0</span>
+            <div class="game-over-container">
+                <div class="game-over-effects">
+                    <div class="confetti"></div>
                 </div>
-                <div class="game-over-stats">
-                    <div class="stat">
-                        <span class="stat-label">Rondes</span>
-                        <span class="stat-value" id="finalRounds">0</span>
+
+                <div class="game-over-content">
+                    <h1 class="game-over-title" id="gameOverTitle">
+                        <span class="title-icon">🎮</span>
+                        GAME OVER
+                    </h1>
+
+                    <div class="score-display">
+                        <div class="score-ring">
+                            <div class="score-ring-inner">
+                                <span class="final-score" id="finalScore">0</span>
+                                <span class="score-label">POINTS</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="stat">
-                        <span class="stat-label">Niveau</span>
-                        <span class="stat-value" id="finalLevel">Easy</span>
+
+                    <div class="final-stats">
+                        <div class="final-stat">
+                            <span class="final-stat-icon">🎯</span>
+                            <span class="final-stat-value" id="finalRounds">0</span>
+                            <span class="final-stat-label">Rounds</span>
+                        </div>
+                        <div class="final-stat">
+                            <span class="final-stat-icon">⚡</span>
+                            <span class="final-stat-value" id="finalLevel">Easy</span>
+                            <span class="final-stat-label">Level</span>
+                        </div>
                     </div>
-                </div>
-                <div class="game-over-actions">
-                    <button id="playAgainBtn" class="btn btn-primary">Opnieuw Spelen</button>
-                    <button id="backToMenuBtn" class="btn btn-secondary">Terug naar Menu</button>
+
+                    <div class="game-over-actions">
+                        <button id="playAgainBtn" class="btn btn-play">
+                            <span class="btn-bg"></span>
+                            <span class="btn-text">🔄 PLAY AGAIN</span>
+                        </button>
+                        <button id="backToMenuBtn" class="btn btn-secondary">
+                            🏠 Main Menu
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
