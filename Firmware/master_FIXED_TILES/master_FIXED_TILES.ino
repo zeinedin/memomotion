@@ -14,8 +14,8 @@
 // ==================== CONFIGURATION ====================
 const char* WIFI_SSID = "iPhone";        // <--- CHECK THIS
 const char* WIFI_PASSWORD = "eveneven";  // <--- CHECK THIS
-const char* WS_HOST = "172.20.10.11";    // <--- CHECK THIS (Your PC IP)
-const uint16_t WS_PORT = 8000;
+const char* WS_HOST = "memo-motion.azurewebsites.net";    // <--- CHECK THIS (Your PC IP)
+const uint16_t WS_PORT = 443;
 
 #define START_BUTTON_PIN 0  // BOOT button
 #define STATUS_LED_PIN 2    // Blue LED
@@ -232,7 +232,7 @@ void initWiFi() {
 }
 
 void initWebSocket() {
-  webSocket.begin(WS_HOST, WS_PORT, "/ws/master");
+  webSocket.beginSSL(WS_HOST, WS_PORT, "/ws/master");
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(3000);
 }
