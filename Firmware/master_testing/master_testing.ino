@@ -27,6 +27,7 @@ WebSocketsClient webSocket;
 bool wsConnected = false;
 int lastButtonState = HIGH;
 unsigned long lastDebounceTime = 0;
+unsigned long lastTileStatusTime = 0;  // Throttle tile_status updates
 uint8_t tileCount = 0;
 
 // Data Structures
@@ -212,11 +213,13 @@ void onTileMessage(const esp_now_recv_info_t *info, const uint8_t *data, int len
 
   if (msg.messageType == 0) { // Register
     registerTile(msg.tileId, info->src_addr);
-  } else if (msg.messageType == 1 && msg.value == 1) { // Step
-     Serial.printf("Tile %d Stepped\n", msg.tileId);
+  } else if (msg.messageType == 1) { // Step/Toggle - send both ON and OFF states
+     bool isOn = (msg.value == 1);
+     Serial.printf("Tile %d Toggled: %s\n", msg.tileId, isOn ? "ON" : "OFF");
      if (wsConnected) {
        StaticJsonDocument<200> doc;
        doc["tile_id"] = msg.tileId;
+       doc["is_on"] = isOn;  // Include LED state from tile
        sendToBackend("player_step", doc);
      }
   }
@@ -226,7 +229,7 @@ void registerTile(uint8_t tileId, const uint8_t *mac) {
   // Check duplicates
   for(int i=0; i<tileCount; i++) {
     if(registeredTiles[i].id == tileId) {
-      // Already registered, just ACK
+      // Already registered, just ACK (no tile_status spam)
       sendCommandToTile(tileId, 3);
       return;
     }
@@ -247,7 +250,9 @@ void registerTile(uint8_t tileId, const uint8_t *mac) {
     Serial.printf("✓ Tile %d Registered\n", tileId);
     sendCommandToTile(tileId, 3); // Send ACK
     
-    if(wsConnected) {
+    // Throttle tile_status updates (max once per 5 seconds)
+    if(wsConnected && (millis() - lastTileStatusTime > 5000)) {
+       lastTileStatusTime = millis();
        StaticJsonDocument<1024> doc;
        doc["master_id"] = WiFi.macAddress();
        JsonArray tiles = doc.createNestedArray("tiles");

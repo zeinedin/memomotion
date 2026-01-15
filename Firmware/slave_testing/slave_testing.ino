@@ -1,6 +1,6 @@
 /**
- * Memory XXL - SLAVE TILE (NeoPixel Version)
- * FEATURES: Auto-Calibrate Touch, Toggle on Step, NeoPixel Green, Non-blocking
+ * Memory XXL - SLAVE TILE (FINAL STABLE v3.0)
+ * Fixed for ESP32 Arduino Core 3.0+ compilation errors
  */
 
 #include <esp_now.h>
@@ -9,210 +9,154 @@
 #include <Adafruit_NeoPixel.h>
 
 // ==================== CONFIGURATION ====================
-#define TILE_ID        5       // !!! CHANGE THIS FOR EACH TILE !!!
-#define LED_PIN        13      // NeoPixel Data Pin
-#define LED_COUNT      12      // Number of LEDs in the ring/strip
-#define TOUCH_PIN      4       // Copper tape / Wire
+#define TILE_ID        5       
+#define LED_PIN        13      
+#define LED_COUNT      12      
+#define TOUCH_PIN      4       
+
+// !!! CRITICAL: Set this to your Router's Channel (1, 6, or 11)
+// If you don't know it, try 1, then 6, then 11 until the Website works.
+#define WIFI_CHANNEL   6       
 
 // Master MAC Address
 uint8_t masterMAC[] = {0x00, 0x70, 0x07, 0x81, 0x4E, 0x10};
 
-// NeoPixel Object
+// NeoPixel
 Adafruit_NeoPixel pixels(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 
-// ==================== DATA STRUCTURES ====================
-typedef struct {
-  uint8_t tileId;
-  uint8_t messageType; 
-  uint8_t value;
-  uint8_t batteryLevel;
-} TileMessage;
-
-typedef struct {
-  uint8_t tileId;
-  uint8_t command; 
-  uint8_t duration;
-} MasterCommand;
-
 // ==================== SETTINGS ====================
-// Touch Sensitivity: Triggers if value drops by 30 (e.g., 40 -> 10)
-const int TOUCH_DROP_REQUIRED = 30; 
+const int TOUCH_THRESHOLD = 100; 
+const int RESET_TOLERANCE = 50; 
 
-// Globals for Logic
+// Globals
 int touchBaseline = 0;
 bool isRegistered = false;
+bool tileLitState = false; 
 
-// Touch State Tracking
-bool currentTouchState = false; // Is foot currently down?
-bool lastTouchState = false;    // Previous loop state
-bool tileLitState = false;      // Logic State: Is the Light ON or OFF?
-
-// Non-blocking Timers
-unsigned long lastDebounceTime = 0;
+// Stability State Machine
+enum StepState { STATE_IDLE, STATE_PRESSED, STATE_WAITING_RELEASE };
+StepState currentState = STATE_IDLE;
 unsigned long lastRegisterTime = 0;
-unsigned long debounceDelay = 50; // 50ms debounce
 
-// Flags for Main Loop Processing (Stability)
-volatile bool cmdReceived = false;
-volatile int  cmdCommand = -1;
+// Data Structures
+typedef struct { uint8_t tileId; uint8_t msgType; uint8_t val; uint8_t batt; } TileMessage;
+typedef struct { uint8_t tileId; uint8_t cmd; uint8_t dur; } MasterCommand;
 
-// ==================== HELPER FUNCTIONS ====================
+// ==================== COMMS HELPER ====================
 
-// Set all LEDs to a specific state (Green or Off)
+void sendMessage(uint8_t type, uint8_t value) {
+  TileMessage msg;
+  msg.tileId = TILE_ID;
+  msg.msgType = type;
+  msg.val = value;
+  esp_now_send(masterMAC, (uint8_t *) &msg, sizeof(msg));
+}
+
+// CORRECTED Callback for ESP32 v3.0+
+void onDataReceived(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
+  if (len != sizeof(MasterCommand)) return;
+  MasterCommand cmd;
+  memcpy(&cmd, data, sizeof(cmd));
+  if (cmd.tileId != TILE_ID && cmd.tileId != 0) return;
+
+  if (cmd.cmd == 0) { tileLitState = false; setLights(false); }
+  else if (cmd.cmd == 1) { tileLitState = true; setLights(true); }
+  else if (cmd.cmd == 3) { 
+    if (!isRegistered) {
+      isRegistered = true; 
+      Serial.println("✓ REGISTERED with Master!");
+      // Flash blue to confirm registration
+      for(int i=0; i<LED_COUNT; i++) pixels.setPixelColor(i, pixels.Color(0, 0, 255));
+      pixels.show();
+      delay(200);
+      setLights(false);
+    }
+  }
+}
+
+// ==================== LED & SETUP ====================
 void setLights(bool isOn) {
   if (isOn) {
-    // GREEN (Red=0, Green=255, Blue=0)
-    for(int i=0; i<pixels.numPixels(); i++) {
-      pixels.setPixelColor(i, pixels.Color(0, 255, 0)); 
-    }
+    for(int i=0; i<LED_COUNT; i++) pixels.setPixelColor(i, pixels.Color(0, 255, 0)); 
   } else {
-    // OFF
     pixels.clear();
   }
   pixels.show();
 }
 
-void sendMessage(uint8_t type, uint8_t value) {
-  TileMessage msg;
-  msg.tileId = TILE_ID;
-  msg.messageType = type;
-  msg.value = value;
-  esp_now_send(masterMAC, (uint8_t *) &msg, sizeof(msg));
-}
-
-// Callback: Runs when data arrives (Keep this short!)
-void onDataReceived(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
-  if (len != sizeof(MasterCommand)) return;
-  MasterCommand cmd;
-  memcpy(&cmd, data, sizeof(cmd));
-
-  if (cmd.tileId != TILE_ID && cmd.tileId != 0) return;
-
-  // Pass command to main loop to handle safely
-  cmdCommand = cmd.command;
-  cmdReceived = true;
-}
-
-// ==================== SETUP ====================
 void setup() {
   Serial.begin(115200);
-  
-  // 1. Init NeoPixels
-  pixels.begin();
-  pixels.setBrightness(150); // Set brightness (0-255)
-  setLights(false); // Start OFF
+  pixels.begin(); pixels.setBrightness(150); setLights(false);
 
-  Serial.printf("\n=== TILE %d STARTING (NEOPIXEL) ===\n", TILE_ID);
+  Serial.printf("\n=== TILE %d v3.0 FIXED ===\n", TILE_ID);
 
-  // 2. Setup WiFi
+  // WiFi Setup
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
+  
+  // FORCE CHANNEL
   esp_wifi_set_promiscuous(true);
-  esp_wifi_set_channel(6, WIFI_SECOND_CHAN_NONE);
+  esp_wifi_set_channel(WIFI_CHANNEL, WIFI_SECOND_CHAN_NONE);
   esp_wifi_set_promiscuous(false);
+  Serial.printf("WiFi Channel set to: %d\n", WIFI_CHANNEL);
 
-  // 3. Init ESP-NOW
-  if (esp_now_init() != ESP_OK) {
-    Serial.println("Error initializing ESP-NOW");
-    ESP.restart();
-  }
+  if (esp_now_init() != ESP_OK) ESP.restart();
+  
+  // Register ONLY Receive Callback (Send callback removed to fix error)
   esp_now_register_recv_cb(onDataReceived);
 
   esp_now_peer_info_t peerInfo = {};
   memcpy(peerInfo.peer_addr, masterMAC, 6);
-  peerInfo.channel = 6;  
+  peerInfo.channel = WIFI_CHANNEL; 
   peerInfo.encrypt = false;
-
+  
   if (esp_now_add_peer(&peerInfo) != ESP_OK) {
-    Serial.println("Failed to add master peer");
-  } else {
-    Serial.println("Master peer added");
+    Serial.println("Peer add failed (Check MAC)");
   }
 
-  // 4. AUTO-CALIBRATE TOUCH
-  // Take 10 readings and average them to find the "normal" state
-  Serial.println("Calibrating Touch...");
+  // Calibration
+  Serial.println("Calibrating...");
   long total = 0;
-  for(int i=0; i<20; i++) {
-    total += touchRead(TOUCH_PIN);
-    delay(10); // Small blocking delay allowed only in setup
-  }
-  touchBaseline = total / 20;
+  for(int i=0; i<50; i++) { total += touchRead(TOUCH_PIN); delay(5); }
+  touchBaseline = total / 50;
+  Serial.printf("Baseline: %d | Threshold: < %d\n", touchBaseline, touchBaseline - TOUCH_THRESHOLD);
   
-  Serial.print("✓ Baseline: "); Serial.println(touchBaseline);
-  Serial.print("✓ Trigger: < "); Serial.println(touchBaseline - TOUCH_DROP_REQUIRED);
-  
-  // Flash Green once to say "Ready"
-  setLights(true);
-  delay(300);
-  setLights(false);
+  // Ready Flash
+  setLights(true); delay(200); setLights(false);
 }
 
 // ==================== LOOP ====================
 void loop() {
-  unsigned long now = millis();
+  int raw = touchRead(TOUCH_PIN);
 
-  // --- 1. HANDLE MASTER COMMANDS (Received via Callback) ---
-  if (cmdReceived) {
-    cmdReceived = false; // Reset flag
-    
-    if (cmdCommand == 0) {       // Master Force OFF
-      tileLitState = false;
-      setLights(false);
-    } 
-    else if (cmdCommand == 1) {  // Master Force ON
-      tileLitState = true;
-      setLights(true);
-    } 
-    else if (cmdCommand == 3) {  // Registration Confirm
-      isRegistered = true;
-      Serial.println("✓ REGISTERED!");
-      // Quick double blink green to confirm
-      setLights(true); delay(100); setLights(false); delay(100); setLights(true); delay(100); setLights(false);
-    }
-  }
-
-  // --- 2. REGISTRATION RETRY ---
-  // If not registered, try every 2 seconds
-  if (!isRegistered && (now - lastRegisterTime > 2000)) {
-    Serial.println("→ Sending Registration...");
-    sendMessage(0, 0); 
-    lastRegisterTime = now;
-  }
-
-  // --- 3. TOUCH & TOGGLE LOGIC ---
-  int touchVal = touchRead(TOUCH_PIN);
-  bool isTouched = (touchVal < (touchBaseline - TOUCH_DROP_REQUIRED));
-
-  // Debouncing
-  if (isTouched != lastTouchState) {
-    lastDebounceTime = now; // Reset timer
-  }
-
-  if ((now - lastDebounceTime) > debounceDelay) {
-    // If state has been stable for 50ms
-    if (isTouched != currentTouchState) {
-      currentTouchState = isTouched;
-
-      // ACTION: Only Trigger when foot goes DOWN (Rising Edge)
-      if (currentTouchState == true) {
-        Serial.printf("→ STEP DETECTED! (Val: %d)\n", touchVal);
-        
-        // TOGGLE LOGIC: Flip state
+  switch (currentState) {
+    case STATE_IDLE:
+      if (raw < (touchBaseline - TOUCH_THRESHOLD)) {
+        Serial.printf("STEP! (Raw: %d) -> Sending to Master\n", raw);
         tileLitState = !tileLitState;
-        
-        // Update LEDs
         setLights(tileLitState);
-
-        // Notify Master of new state (1=ON, 0=OFF)
-        if (isRegistered) {
-          sendMessage(1, tileLitState ? 1 : 0);
-        }
+        
+        // Send Message
+        sendMessage(1, tileLitState ? 1 : 0);
+        
+        currentState = STATE_PRESSED;
       }
-    }
+      break;
+
+    case STATE_PRESSED:
+      if (raw > (touchBaseline - TOUCH_THRESHOLD + 20)) currentState = STATE_WAITING_RELEASE;
+      break;
+
+    case STATE_WAITING_RELEASE:
+      if (raw > (touchBaseline - RESET_TOLERANCE)) currentState = STATE_IDLE;
+      break;
   }
 
-  lastTouchState = isTouched;
-  
-  // No delay() here - loop runs as fast as possible for responsiveness
+  // Register Retry (Every 3 sec until registered, then stop)
+  if (!isRegistered && (millis() - lastRegisterTime > 3000)) {
+    Serial.println("Attempting Register...");
+    sendMessage(0, 0);
+    lastRegisterTime = millis();
+  }
+  delay(5);  // Reduced delay for faster response
 }

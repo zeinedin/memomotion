@@ -721,27 +721,35 @@ async def handle_tile_toggle(data: dict):
         print(f"  Toggle ignored (wrong phase: {state.game_phase})")
         return
     
-    # Toggle tile selection
-    if tile_id in state.selected_tiles:
-        # Deselect tile
-        state.selected_tiles.remove(tile_id)
-        is_selected = False
-        print(f"  Tile {tile_id} DESELECTED (total: {len(state.selected_tiles)})")
+    # Use LED state from tile if provided (more accurate), otherwise toggle
+    if "is_on" in data:
+        # Trust the tile's LED state (tile is authoritative)
+        is_selected = data.get("is_on", False)
+        if is_selected:
+            state.selected_tiles.add(tile_id)
+        else:
+            state.selected_tiles.discard(tile_id)
+        print(f"  Tile {tile_id} {'SELECTED' if is_selected else 'DESELECTED'} (from tile, total: {len(state.selected_tiles)})")
     else:
-        # Select tile
-        state.selected_tiles.add(tile_id)
-        is_selected = True
-        print(f"  Tile {tile_id} SELECTED (total: {len(state.selected_tiles)})")
-    
-    # Tell master to toggle LED on tile
-    if state.master_ws:
-        await state.master_ws.send_json({
-            "event": "toggle_tile",
-            "data": {
-                "tile_id": tile_id,
-                "on": is_selected
-            }
-        })
+        # Fallback: Toggle tile selection
+        if tile_id in state.selected_tiles:
+            state.selected_tiles.remove(tile_id)
+            is_selected = False
+            print(f"  Tile {tile_id} DESELECTED (total: {len(state.selected_tiles)})")
+        else:
+            state.selected_tiles.add(tile_id)
+            is_selected = True
+            print(f"  Tile {tile_id} SELECTED (total: {len(state.selected_tiles)})")
+        
+        # Tell master to toggle LED on tile (only if we calculated the toggle)
+        if state.master_ws:
+            await state.master_ws.send_json({
+                "event": "toggle_tile",
+                "data": {
+                    "tile_id": tile_id,
+                    "on": is_selected
+                }
+            })
     
     # Broadcast to frontend
     await broadcast_to_frontends({
