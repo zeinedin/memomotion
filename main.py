@@ -561,12 +561,9 @@ async def handle_start_button():
         # Start a new round - show pattern
         await start_show_pattern(connected_tiles)
     elif state.game_phase == "selecting":
-        # If pressed during selecting phase, ignore (player should use CONFIRM button)
-        print("  START pressed during selecting - waiting for CONFIRM button")
-        await broadcast_to_frontends({
-            "event": "info",
-            "data": {"message": "Selecteer de tegels en druk op CONFIRM!"}
-        })
+        # START button during selecting phase = CONFIRM selection
+        print("  START pressed during selecting - treating as CONFIRM")
+        await handle_confirm_button()
     else:
         # In any other phase, ignore
         print(f"  START pressed during {state.game_phase} - ignoring")
