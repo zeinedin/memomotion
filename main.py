@@ -1,10 +1,10 @@
 """
 Memory XXL Backend - TESTING VERSION
-January 12, 2025
+January 15, 2026
 
 Features:
 - Team registration with levels
-- Leaderboard with SQLite database
+- Leaderboard with Azure Cosmos DB
 - Visual tile pattern display
 """
 
@@ -18,34 +18,65 @@ import asyncio
 from datetime import datetime
 from typing import Dict, List, Optional
 import random
-import sqlite3
 import os
+import uuid
+
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
+
+# Azure Cosmos DB imports
+from azure.cosmos import CosmosClient, PartitionKey, exceptions
 
 app = FastAPI(title="Memory XXL Backend")
 
-# ==================== DATABASE ====================
-DB_PATH = "leaderboard.db"
+# ==================== COSMOS DB ====================
+# Configuration - Set these environment variables in .env file
+COSMOS_ENDPOINT = os.getenv("COSMOS_ENDPOINT", "https://your-account.documents.azure.com:443/")
+COSMOS_KEY = os.getenv("COSMOS_KEY", "your-primary-key-here")
+COSMOS_DATABASE = os.getenv("COSMOS_DATABASE", "memomotion")
+COSMOS_CONTAINER = os.getenv("COSMOS_CONTAINER", "leaderboard")
 
-def init_database():
-    """Initialize SQLite database for leaderboard"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS leaderboard (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            team_name TEXT NOT NULL,
-            score INTEGER NOT NULL,
-            level TEXT NOT NULL,
-            rounds INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.commit()
-    conn.close()
-    print("✓ Database initialized")
+# Global Cosmos DB clients
+cosmos_client = None
+database = None
+container = None
+cosmos_initialized = False
 
-# Initialize database on startup
-init_database()
+def init_cosmos_db():
+    """Initialize Cosmos DB connection"""
+    global cosmos_client, database, container, cosmos_initialized
+    
+    try:
+        # Check if credentials are set
+        if "your-account" in COSMOS_ENDPOINT or "your-primary-key" in COSMOS_KEY:
+            print("⚠️ Cosmos DB credentials not configured - set COSMOS_ENDPOINT and COSMOS_KEY environment variables")
+            return False
+        
+        # Create the Cosmos client
+        cosmos_client = CosmosClient(COSMOS_ENDPOINT, COSMOS_KEY)
+        
+        # Get database reference (assumes database exists)
+        database = cosmos_client.get_database_client(COSMOS_DATABASE)
+        
+        # Get container reference (assumes container exists)
+        container = database.get_container_client(COSMOS_CONTAINER)
+        
+        # Test connection by reading container properties
+        container.read()
+        
+        cosmos_initialized = True
+        print("✓ Cosmos DB connected successfully")
+        print(f"  Database: {COSMOS_DATABASE}")
+        print(f"  Container: {COSMOS_CONTAINER}")
+        return True
+        
+    except exceptions.CosmosHttpResponseError as e:
+        print(f"✗ Cosmos DB connection failed: {e.message}")
+        return False
+    except Exception as e:
+        print(f"✗ Cosmos DB error: {e}")
+        return False
 
 # ==================== MODELS ====================
 class ScoreEntry(BaseModel):
@@ -78,9 +109,10 @@ class GameState:
         self.tiles: Dict[int, dict] = {}  # tile_id -> {connected, battery}
         
         # Game states
-        self.game_phase: str = "idle"  # idle, showing_pattern, memorizing, checking
+        self.game_phase: str = "idle"  # idle, showing_pattern, selecting, checking
         self.pattern: List[int] = []
         self.player_steps: List[int] = []
+        self.selected_tiles: set = set()  # Tiles currently selected by player (toggle mode)
         
         # Team info
         self.current_team: str = ""
@@ -136,61 +168,121 @@ async def get_stats():
         "master_connected": state.master_id is not None
     }
 
-# ==================== LEADERBOARD API ====================
+@app.get("/api/cosmos-status")
+async def get_cosmos_status():
+    """Debug endpoint to check Cosmos DB connection status"""
+    return {
+        "cosmos_initialized": cosmos_initialized,
+        "endpoint_configured": "your-account" not in COSMOS_ENDPOINT,
+        "key_configured": "your-primary-key" not in COSMOS_KEY,
+        "database": COSMOS_DATABASE,
+        "container": COSMOS_CONTAINER,
+        "endpoint_prefix": COSMOS_ENDPOINT[:50] + "..." if len(COSMOS_ENDPOINT) > 50 else COSMOS_ENDPOINT
+    }
+
+# ==================== LEADERBOARD API (Cosmos DB) ====================
 @app.get("/api/leaderboard")
-async def get_leaderboard(limit: int = 10):
-    """Get leaderboard entries"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT id, team_name, score, level, rounds, created_at 
-        FROM leaderboard 
-        ORDER BY score DESC 
-        LIMIT ?
-    ''', (limit,))
-    rows = cursor.fetchall()
-    conn.close()
+async def get_leaderboard(limit: int = 10, level: Optional[str] = None):
+    """Get leaderboard entries from Cosmos DB"""
+    if not cosmos_initialized:
+        print("⚠️ Leaderboard request but Cosmos DB not initialized!")
+        return {"leaderboard": [], "error": "Database not connected", "cosmos_initialized": False}
     
-    leaderboard = [
-        {
-            "id": row[0],
-            "team_name": row[1],
-            "score": row[2],
-            "level": row[3],
-            "rounds": row[4],
-            "created_at": row[5]
-        }
-        for row in rows
-    ]
-    
-    return {"leaderboard": leaderboard}
+    try:
+        # Build query - order by score descending
+        if level:
+            query = f"SELECT * FROM c WHERE c.level = @level ORDER BY c.score DESC OFFSET 0 LIMIT {limit}"
+            parameters = [{"name": "@level", "value": level}]
+        else:
+            query = f"SELECT * FROM c ORDER BY c.score DESC OFFSET 0 LIMIT {limit}"
+            parameters = []
+        
+        print(f"📊 Querying leaderboard: {query}")
+        
+        # Execute query (cross-partition since we use /id as partition key)
+        items = list(container.query_items(
+            query=query,
+            parameters=parameters,
+            enable_cross_partition_query=True
+        ))
+        
+        print(f"📊 Found {len(items)} items")
+        
+        # Format response (remove Cosmos DB internal fields)
+        leaderboard = [
+            {
+                "id": item.get("id"),
+                "team_name": item.get("team_name"),
+                "score": item.get("score"),
+                "level": item.get("level"),
+                "rounds": item.get("rounds", 0),
+                "created_at": item.get("created_at")
+            }
+            for item in items
+        ]
+        
+        return {"leaderboard": leaderboard}
+        
+    except Exception as e:
+        print(f"✗ Error fetching leaderboard: {e}")
+        return {"leaderboard": [], "error": str(e)}
 
 @app.post("/api/leaderboard")
 async def add_score(entry: ScoreEntry):
-    """Add a new score to leaderboard"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO leaderboard (team_name, score, level, rounds)
-        VALUES (?, ?, ?, ?)
-    ''', (entry.team_name, entry.score, entry.level, entry.rounds))
-    conn.commit()
-    conn.close()
+    """Add a new score to Cosmos DB leaderboard"""
+    if not cosmos_initialized:
+        return {"status": "error", "message": "Database not connected"}
     
-    print(f"✓ Score saved: {entry.team_name} - {entry.score} ({entry.level})")
-    
-    return {"status": "ok", "message": "Score saved"}
+    try:
+        # Create document with unique ID
+        item = {
+            "id": str(uuid.uuid4()),  # Unique ID (also partition key)
+            "team_name": entry.team_name,
+            "score": entry.score,
+            "level": entry.level,
+            "rounds": entry.rounds,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        # Insert into Cosmos DB
+        container.create_item(body=item)
+        
+        print(f"✓ Score saved to Cosmos DB: {entry.team_name} - {entry.score} ({entry.level})")
+        
+        return {"status": "ok", "message": "Score saved", "id": item["id"]}
+        
+    except exceptions.CosmosHttpResponseError as e:
+        print(f"✗ Cosmos DB error: {e.message}")
+        return {"status": "error", "message": e.message}
+    except Exception as e:
+        print(f"✗ Error saving score: {e}")
+        return {"status": "error", "message": str(e)}
 
 @app.delete("/api/leaderboard")
 async def clear_leaderboard():
-    """Clear all leaderboard entries (admin)"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM leaderboard')
-    conn.commit()
-    conn.close()
+    """Clear all leaderboard entries (admin) - Use with caution!"""
+    if not cosmos_initialized:
+        return {"status": "error", "message": "Database not connected"}
     
-    return {"status": "ok", "message": "Leaderboard cleared"}
+    try:
+        # Query all items
+        items = list(container.query_items(
+            query="SELECT c.id FROM c",
+            enable_cross_partition_query=True
+        ))
+        
+        deleted_count = 0
+        for item in items:
+            # Delete each item (partition key is the id)
+            container.delete_item(item=item["id"], partition_key=item["id"])
+            deleted_count += 1
+        
+        print(f"✓ Cleared {deleted_count} entries from leaderboard")
+        return {"status": "ok", "message": f"Cleared {deleted_count} entries"}
+        
+    except Exception as e:
+        print(f"✗ Error clearing leaderboard: {e}")
+        return {"status": "error", "message": str(e)}
 
 # ==================== ADMIN ROUTES ====================
 @app.get("/admin")
@@ -251,19 +343,21 @@ async def update_speedrun_config(config: dict):
     return {"status": "ok"}
 
 @app.delete("/api/admin/leaderboard/{score_id}")
-async def delete_single_score(score_id: int):
-    """Delete a single score from leaderboard"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM leaderboard WHERE id = ?', (score_id,))
-    conn.commit()
-    affected = cursor.rowcount
-    conn.close()
+async def delete_single_score(score_id: str):
+    """Delete a single score from leaderboard by ID"""
+    if not cosmos_initialized:
+        return {"status": "error", "message": "Database not connected"}
     
-    if affected > 0:
+    try:
+        # In Cosmos DB with /id as partition key, the id is also the partition key
+        container.delete_item(item=score_id, partition_key=score_id)
         print(f"✓ Score {score_id} deleted")
         return {"status": "ok", "message": f"Score {score_id} deleted"}
-    return {"status": "error", "message": "Score not found"}
+    except exceptions.CosmosResourceNotFoundError:
+        return {"status": "error", "message": "Score not found"}
+    except Exception as e:
+        print(f"✗ Error deleting score: {e}")
+        return {"status": "error", "message": str(e)}
 
 # ==================== MASTER WEBSOCKET ====================
 @app.websocket("/ws/master")
@@ -340,23 +434,30 @@ async def handle_master_message(msg: dict):
         print("→ START button pressed!")
         await handle_start_button()
     
+    elif event == "confirm_button_pressed":
+        print("→ CONFIRM button pressed!")
+        await handle_confirm_button()
+    
     elif event == "player_step":
-        await handle_player_step(data)
+        await handle_tile_toggle(data)
     
     elif event == "tile_touched" or event == "tile_pressed":
-        # Tile was touched/pressed - always forward to frontend for visual feedback
+        # Tile was touched/pressed - handle as toggle in selecting phase
         tile_id = data.get("tile_id")
         print(f"  Tile {tile_id} touched!")
-        await broadcast_to_frontends({
-            "event": "tile_pressed",
-            "data": {
-                "tile_id": tile_id,
-                "timestamp": data.get("timestamp", 0)
-            }
-        })
-        # If game is in progress, also handle as player step
-        if state.game_phase == "memorizing":
-            await handle_player_step(data)
+        
+        # If game is in selecting phase, handle as toggle
+        if state.game_phase == "selecting":
+            await handle_tile_toggle(data)
+        else:
+            # Just visual feedback outside of selecting phase
+            await broadcast_to_frontends({
+                "event": "tile_pressed",
+                "data": {
+                    "tile_id": tile_id,
+                    "timestamp": data.get("timestamp", 0)
+                }
+            })
     
     elif event == "pattern_shown":
         print("✓ Pattern displayed on tiles")
@@ -459,23 +560,24 @@ async def handle_start_button():
     if state.game_phase == "idle":
         # Start a new round - show pattern
         await start_show_pattern(connected_tiles)
-    elif state.game_phase == "memorizing":
-        # If pressed during memorizing phase, ignore (player should step on tiles)
-        print("  START pressed during memorizing - waiting for player steps")
+    elif state.game_phase == "selecting":
+        # If pressed during selecting phase, ignore (player should use CONFIRM button)
+        print("  START pressed during selecting - waiting for CONFIRM button")
         await broadcast_to_frontends({
             "event": "info",
-            "data": {"message": "Step on the tiles in the correct order!"}
+            "data": {"message": "Selecteer de tegels en druk op CONFIRM!"}
         })
     else:
         # In any other phase, ignore
         print(f"  START pressed during {state.game_phase} - ignoring")
 
 async def start_show_pattern(connected_tiles: List[int]):
-    """Generate and show pattern"""
-    print("→ Showing pattern...")
+    """Generate and show pattern - all tiles at once for 8 seconds"""
+    print("→ Showing pattern for 8 seconds...")
     
     state.game_phase = "showing_pattern"
     state.player_steps = []
+    state.selected_tiles = set()  # Clear selected tiles
     state.round_number += 1
     
     # Get pattern length from level config
@@ -487,99 +589,166 @@ async def start_show_pattern(connected_tiles: List[int]):
     
     print(f"  Pattern: {state.pattern} (Level: {state.current_level})")
     
-    # Tell frontend
+    # Tell frontend - show all pattern tiles at once
     await broadcast_to_frontends({
         "event": "game_started",
         "data": {
             "phase": "showing_pattern",
             "pattern": state.pattern,
-            "message": "Kijk naar het patroon!",
-            "round": state.round_number
+            "message": "Onthoud deze tegels! (8 seconden)",
+            "round": state.round_number,
+            "display_mode": "simultaneous"  # New flag for simultaneous display
         }
     })
     
-    # Tell master to show pattern on tiles
+    # Tell master to show ALL pattern tiles at once for 8 seconds
     if state.master_ws:
         await state.master_ws.send_json({
-            "event": "show_pattern",
+            "event": "show_pattern_simultaneous",
             "data": {
                 "pattern": state.pattern,
-                "duration": 800
+                "duration": 8000  # 8 seconds in milliseconds
             }
         })
     
-    # After pattern shown, enter memorizing phase
-    await asyncio.sleep(pattern_length * 1.2 + 1)
-    state.game_phase = "memorizing"
+    # Wait 8 seconds for pattern display
+    await asyncio.sleep(8)
+    
+    # Enter selecting phase - player can now toggle tiles
+    state.game_phase = "selecting"
+    
+    # Turn off pattern tiles on master
+    if state.master_ws:
+        await state.master_ws.send_json({
+            "event": "pattern_hide",
+            "data": {}
+        })
     
     await broadcast_to_frontends({
-        "event": "memorizing_phase",
+        "event": "selecting_phase",
         "data": {
-            "pattern": state.pattern,
-            "message": "Stap op de tegels in de juiste volgorde!"
+            "pattern_length": len(state.pattern),
+            "message": "Selecteer de juiste tegels en druk op CONFIRM!"
         }
     })
 
-async def handle_player_step(data: dict):
-    """Player stepped on a tile"""
+async def handle_tile_toggle(data: dict):
+    """Player stepped on a tile - toggle selection on/off"""
     tile_id = data.get("tile_id")
     
     if tile_id is None:
-        print("  Step ignored (no tile_id)")
+        print("  Toggle ignored (no tile_id)")
         return
     
-    if state.game_phase != "memorizing":
-        print(f"  Step ignored (wrong phase: {state.game_phase})")
+    if state.game_phase != "selecting":
+        print(f"  Toggle ignored (wrong phase: {state.game_phase})")
         return
     
-    print(f"  Player stepped: Tile {tile_id}")
+    # Toggle tile selection
+    if tile_id in state.selected_tiles:
+        # Deselect tile
+        state.selected_tiles.remove(tile_id)
+        is_selected = False
+        print(f"  Tile {tile_id} DESELECTED (total: {len(state.selected_tiles)})")
+    else:
+        # Select tile
+        state.selected_tiles.add(tile_id)
+        is_selected = True
+        print(f"  Tile {tile_id} SELECTED (total: {len(state.selected_tiles)})")
     
-    # Record step
-    state.player_steps.append(tile_id)
-    current_step = len(state.player_steps)
-    expected_steps = len(state.pattern)
-    
-    # Check if current step is correct (real-time validation)
-    is_correct = state.player_steps[current_step - 1] == state.pattern[current_step - 1]
-    
-    # Send to frontend to show
-    await broadcast_to_frontends({
-        "event": "player_stepped",
-        "data": {
-            "tile_id": tile_id,
-            "step_number": current_step,
-            "expected_steps": expected_steps,
-            "is_correct": is_correct,
-            "steps_so_far": state.player_steps
-        }
-    })
-    
-    # Tell master to light up tile
+    # Tell master to toggle LED on tile
     if state.master_ws:
         await state.master_ws.send_json({
-            "event": "light_tile",
+            "event": "toggle_tile",
             "data": {
                 "tile_id": tile_id,
-                "on": True
+                "on": is_selected
             }
         })
     
-    # If wrong step, end game immediately
-    if not is_correct:
-        print(f"✗ WRONG STEP! Expected: {state.pattern[current_step - 1]}, Got: {tile_id}")
-        await asyncio.sleep(0.5)  # Brief pause to show the error
-        await end_game_wrong()
+    # Broadcast to frontend
+    await broadcast_to_frontends({
+        "event": "tile_toggled",
+        "data": {
+            "tile_id": tile_id,
+            "is_selected": is_selected,
+            "selected_tiles": list(state.selected_tiles),
+            "total_selected": len(state.selected_tiles),
+            "expected_count": len(state.pattern)
+        }
+    })
+
+async def handle_confirm_button():
+    """Handle CONFIRM button press - validate selected tiles"""
+    if state.game_phase != "selecting":
+        print(f"  CONFIRM ignored (wrong phase: {state.game_phase})")
         return
     
-    # If all steps are correct and complete, auto-check
-    if current_step >= expected_steps:
-        print(f"✓ All {expected_steps} steps received correctly!")
-        await asyncio.sleep(0.5)  # Brief pause before showing success
-        await check_pattern()
+    print(f"→ Validating selection...")
+    print(f"  Selected: {sorted(state.selected_tiles)}")
+    print(f"  Pattern:  {sorted(state.pattern)}")
+    
+    state.game_phase = "checking"
+    
+    # Check if selected tiles match pattern (order doesn't matter)
+    pattern_set = set(state.pattern)
+    correct = state.selected_tiles == pattern_set
+    
+    # Get points from level config
+    level_config = LEVEL_CONFIG.get(state.current_level, LEVEL_CONFIG["easy"])
+    
+    if correct:
+        points = len(state.pattern) * level_config["points_per_tile"]
+        state.current_score += points
+        if state.current_score > state.high_score:
+            state.high_score = state.current_score
+        
+        print(f"✓ CORRECT! Score: {state.current_score}")
+        
+        # Tell master to show success
+        if state.master_ws:
+            await state.master_ws.send_json({
+                "event": "pattern_correct",
+                "data": {}
+            })
+        
+        await broadcast_to_frontends({
+            "event": "pattern_correct",
+            "data": {
+                "message": "🎉 Perfect!",
+                "score": state.current_score,
+                "round": state.round_number,
+                "points_earned": points,
+                "pattern": state.pattern,
+                "selected_tiles": list(state.selected_tiles)
+            }
+        })
+        
+        # Wait then reset for next round
+        await asyncio.sleep(2)
+        
+        # Turn off all tiles
+        if state.master_ws:
+            await state.master_ws.send_json({
+                "event": "end_game",
+                "data": {}
+            })
+        
+        # Reset for next round (keep score and round number)
+        state.game_phase = "idle"
+        state.player_steps = []
+        state.pattern = []
+        state.selected_tiles = set()
+        # Don't auto-start, wait for START button
+    else:
+        print(f"✗ WRONG SELECTION!")
+        print(f"  Missing: {pattern_set - state.selected_tiles}")
+        print(f"  Extra:   {state.selected_tiles - pattern_set}")
+        await end_game_wrong_selection()
 
-async def end_game_wrong():
-    """End the game when player makes a wrong step"""
-    print("→ Wrong step - ending game...")
+async def end_game_wrong_selection():
+    """End the game when player selects wrong tiles"""
+    print("→ Wrong selection - ending game...")
     state.game_phase = "checking"
     
     # Turn off all tiles
@@ -598,7 +767,7 @@ async def end_game_wrong():
         "data": {
             "message": "❌ Fout! Game Over",
             "expected": state.pattern,
-            "player_steps": state.player_steps,
+            "selected_tiles": list(state.selected_tiles),
             "score": state.current_score,
             "round": state.round_number
         }
@@ -621,56 +790,7 @@ async def end_game_wrong():
     state.game_phase = "idle"
     state.player_steps = []
     state.pattern = []
-
-async def check_pattern():
-    """Check if player's pattern is correct - called when all steps are received"""
-    print("→ Checking pattern...")
-    state.game_phase = "checking"
-    
-    # Turn off all tiles
-    if state.master_ws:
-        await state.master_ws.send_json({
-            "event": "end_game",
-            "data": {}
-        })
-    
-    # Pattern should already be verified step-by-step, but double check
-    correct = state.player_steps == state.pattern
-    
-    # Get points from level config
-    level_config = LEVEL_CONFIG.get(state.current_level, LEVEL_CONFIG["easy"])
-    
-    if correct:
-        points = len(state.pattern) * level_config["points_per_tile"]
-        state.current_score += points
-        if state.current_score > state.high_score:
-            state.high_score = state.current_score
-        
-        print(f"✓ CORRECT! Score: {state.current_score}")
-        
-        await broadcast_to_frontends({
-            "event": "pattern_correct",
-            "data": {
-                "message": "🎉 Perfect!",
-                "score": state.current_score,
-                "round": state.round_number,
-                "points_earned": points,
-                "pattern": state.pattern,
-                "player_steps": state.player_steps
-            }
-        })
-        
-        # Wait then reset for next round
-        await asyncio.sleep(2)
-        
-        # Reset for next round (keep score and round number)
-        state.game_phase = "idle"
-        state.player_steps = []
-        state.pattern = []
-        # Don't auto-start, wait for START button
-    else:
-        # This shouldn't happen with real-time validation, but handle just in case
-        await end_game_wrong()
+    state.selected_tiles = set()
 
 # ==================== HELPERS ====================
 async def broadcast_to_frontends(message: dict):
@@ -691,15 +811,19 @@ async def broadcast_to_frontends(message: dict):
 @app.on_event("startup")
 async def startup():
     print("\n" + "="*50)
-    print("Memory XXL Backend - v2.0")
-    print("January 12, 2025")
+    print("Memory XXL Backend - v2.1")
+    print("January 15, 2026 - Azure Cosmos DB Edition")
     print("="*50)
+    
+    # Initialize Cosmos DB
+    print("\n🔗 Connecting to Azure Cosmos DB...")
+    init_cosmos_db()
+    
     print("\n✓ Server ready")
-    print("✓ Database ready")
     print(f"  Master endpoint: ws://YOUR_IP:8000/ws/master")
     print(f"  Frontend endpoint: ws://YOUR_IP:8000/ws/frontend")
     print(f"  Leaderboard API: http://YOUR_IP:8000/api/leaderboard")
-    print(f"  Health check: http://YOUR_IP:8000/")
+    print(f"  Health check: http://YOUR_IP:8000/status")
     print("\nWaiting for connections...\n")
     
 

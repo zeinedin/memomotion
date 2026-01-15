@@ -1252,6 +1252,92 @@ body {
     animation: wrongShake 0.5s ease;
 }
 
+/* Selected tile (toggle mode) */
+.tile.selected {
+    background: linear-gradient(135deg, rgba(0, 255, 136, 0.4), rgba(0, 245, 255, 0.4));
+    border-color: var(--neon-green);
+    box-shadow: 0 0 40px rgba(0, 255, 136, 0.6), inset 0 0 20px rgba(0, 255, 136, 0.2);
+    animation: selectedPulse 1.5s ease infinite;
+}
+
+@keyframes selectedPulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 30px rgba(0, 255, 136, 0.4), inset 0 0 15px rgba(0, 255, 136, 0.1);
+    }
+
+    50% {
+        box-shadow: 0 0 50px rgba(0, 255, 136, 0.7), inset 0 0 25px rgba(0, 255, 136, 0.2);
+    }
+}
+
+/* Selection counter in sequence grid */
+.selection-counter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-family: var(--font-display);
+    font-size: 2rem;
+    color: var(--neon-cyan);
+    padding: 1rem 2rem;
+    background: rgba(0, 245, 255, 0.1);
+    border: 2px solid var(--neon-cyan);
+    border-radius: var(--radius-md);
+    box-shadow: 0 0 20px rgba(0, 245, 255, 0.3);
+}
+
+.selection-counter #selected-count {
+    color: var(--neon-green);
+    font-weight: 700;
+}
+
+.selection-counter #expected-count {
+    color: var(--neon-yellow);
+}
+
+/* Selection instruction in steps grid */
+.selection-instruction {
+    text-align: center;
+    padding: 1.5rem;
+    background: rgba(0, 245, 255, 0.05);
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(0, 245, 255, 0.2);
+}
+
+.selection-instruction p {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.selection-instruction .hint {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+/* Pattern active box (during simultaneous display) */
+.sequence-box.pattern-active {
+    background: var(--gradient-warning);
+    border-color: var(--neon-yellow);
+    box-shadow: 0 0 20px rgba(255, 255, 0, 0.5);
+    animation: patternBoxPulse 1s ease infinite;
+}
+
+@keyframes patternBoxPulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 15px rgba(255, 255, 0, 0.4);
+    }
+
+    50% {
+        box-shadow: 0 0 30px rgba(255, 255, 0, 0.7);
+    }
+}
+
 @keyframes wrongShake {
 
     0%,

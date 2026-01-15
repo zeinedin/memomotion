@@ -12,10 +12,12 @@ const gameState = {
   round: 0,
   pattern: [],
   playerSteps: [],
+  selectedTiles: new Set(), // Tiles currently selected by player (toggle mode)
   connectedTiles: [],
   expectedTiles: 0,
   masterConnected: false,
   isPlaying: false,
+  isSelectingPhase: false, // True during tile selection phase
   timeLeft: 0,
   timerInterval: null,
 };
@@ -358,6 +360,8 @@ function handleWebSocketMessage(message) {
       // Pattern was correct - update score and prepare for next round
       gameState.score = msgData.score || message.score || gameState.score;
       gameState.round = msgData.round || message.round || gameState.round;
+      gameState.isSelectingPhase = false;
+      gameState.selectedTiles = new Set();
       updateGameStats();
       setMessage(
         '🎉',
@@ -366,7 +370,13 @@ function handleWebSocketMessage(message) {
       // Clear tile states
       setTimeout(() => {
         document.querySelectorAll('.tile').forEach((tile) => {
-          tile.classList.remove('step', 'pattern', 'correct');
+          tile.classList.remove(
+            'step',
+            'pattern',
+            'correct',
+            'selected',
+            'active'
+          );
         });
         elements.sequenceSection.classList.remove('visible');
         elements.stepsSection.classList.remove('visible');
@@ -384,10 +394,37 @@ function handleWebSocketMessage(message) {
       break;
     case 'game_started':
       gameState.isPlaying = true;
-      gameState.round = 0;
+      gameState.round = msgData.round || 0;
       gameState.score = 0;
+      gameState.selectedTiles = new Set();
+      gameState.isSelectingPhase = false;
       updateGameStats();
-      setMessage('🚀', 'Game Started! Get ready...');
+
+      // Check if pattern should be shown simultaneously
+      if (msgData.display_mode === 'simultaneous' && msgData.pattern) {
+        setMessage('🧠', msgData.message || 'Onthoud deze tegels!');
+        showPatternSimultaneous(msgData.pattern);
+      } else {
+        setMessage('🚀', msgData.message || 'Game Started! Get ready...');
+      }
+      break;
+    case 'selecting_phase':
+      // Enter tile selection phase - player can now toggle tiles
+      gameState.isSelectingPhase = true;
+      gameState.selectedTiles = new Set();
+      setMessage('👆', msgData.message || 'Selecteer de juiste tegels!');
+      startSelectingPhase(
+        msgData.pattern_length || LEVEL_CONFIG[gameState.level].steps
+      );
+      break;
+    case 'tile_toggled':
+      // A tile was toggled on/off
+      handleTileToggled(
+        msgData.tile_id,
+        msgData.is_selected,
+        msgData.selected_tiles || [],
+        msgData.expected_count || 0
+      );
       break;
     case 'master_connected':
       gameState.masterConnected = true;
@@ -727,6 +764,8 @@ function resetGame() {
   gameState.round = 0;
   gameState.pattern = [];
   gameState.playerSteps = [];
+  gameState.selectedTiles = new Set();
+  gameState.isSelectingPhase = false;
 
   // Clear timer if running
   if (gameState.timerInterval) {
@@ -746,7 +785,14 @@ function resetGame() {
 
   // Clear tile states
   document.querySelectorAll('.tile').forEach((tile) => {
-    tile.classList.remove('active', 'pattern', 'step', 'correct', 'wrong');
+    tile.classList.remove(
+      'active',
+      'pattern',
+      'step',
+      'correct',
+      'wrong',
+      'selected'
+    );
   });
 }
 
@@ -810,6 +856,122 @@ function showPattern(pattern) {
     }, delay);
     delay += 800;
   });
+}
+
+// ============================================
+// SIMULTANEOUS PATTERN DISPLAY (8 seconds)
+// ============================================
+
+function showPatternSimultaneous(pattern) {
+  gameState.pattern = pattern;
+  gameState.selectedTiles = new Set();
+  gameState.isSelectingPhase = false;
+
+  // Show sequence section with all tiles at once
+  elements.sequenceSection.classList.add('visible');
+  elements.stepsSection.classList.remove('visible');
+  elements.sequenceGrid.innerHTML = '';
+
+  // Clear previous tile highlights
+  document.querySelectorAll('.tile').forEach((tile) => {
+    tile.classList.remove(
+      'pattern',
+      'step',
+      'correct',
+      'wrong',
+      'selected',
+      'active'
+    );
+  });
+
+  // Show all pattern tiles simultaneously
+  pattern.forEach((tileId, index) => {
+    // Add to sequence grid (shows which tiles are part of pattern)
+    const box = document.createElement('div');
+    box.className = 'sequence-box pattern-active';
+    box.textContent = tileId;
+    elements.sequenceGrid.appendChild(box);
+
+    // Highlight tile on grid - stays on for 8 seconds
+    const tile = document.getElementById(`tile-${tileId}`);
+    if (tile) {
+      tile.classList.add('pattern');
+    }
+  });
+
+  // After 8 seconds, tiles will turn off (handled by backend sending selecting_phase)
+}
+
+// ============================================
+// SELECTING PHASE - Toggle tiles on/off
+// ============================================
+
+function startSelectingPhase(expectedCount) {
+  gameState.playerSteps = [];
+  gameState.selectedTiles = new Set();
+  gameState.isSelectingPhase = true;
+
+  // Hide pattern display, show selection counter
+  elements.sequenceSection.classList.add('visible');
+  elements.stepsSection.classList.add('visible');
+
+  // Clear pattern highlights - pattern is now hidden
+  document.querySelectorAll('.tile').forEach((tile) => {
+    tile.classList.remove('pattern');
+  });
+
+  // Update sequence grid to show selection counter
+  elements.sequenceGrid.innerHTML = `
+    <div class="selection-counter">
+      <span id="selected-count">0</span> / <span id="expected-count">${expectedCount}</span>
+    </div>
+  `;
+
+  // Update steps grid with instruction
+  elements.stepsGrid.innerHTML = `
+    <div class="selection-instruction">
+      <p>Selecteer ${expectedCount} tegels</p>
+      <p class="hint">Stap op een tegel om te selecteren/deselecteren</p>
+      <p class="hint">Druk op CONFIRM als je klaar bent</p>
+    </div>
+  `;
+}
+
+function handleTileToggled(tileId, isSelected, selectedTiles, expectedCount) {
+  console.log('🔄 Tile toggled:', tileId, 'selected:', isSelected);
+
+  // Update local state
+  if (isSelected) {
+    gameState.selectedTiles.add(tileId);
+  } else {
+    gameState.selectedTiles.delete(tileId);
+  }
+
+  // Update tile visual
+  const tile = document.getElementById(`tile-${tileId}`);
+  if (tile) {
+    if (isSelected) {
+      tile.classList.add('selected', 'active');
+    } else {
+      tile.classList.remove('selected', 'active');
+    }
+  }
+
+  // Update selection counter
+  const selectedCountEl = document.getElementById('selected-count');
+  if (selectedCountEl) {
+    selectedCountEl.textContent = selectedTiles.length;
+  }
+
+  // Update message
+  const remaining = expectedCount - selectedTiles.length;
+  if (remaining > 0) {
+    setMessage('👆', `Nog ${remaining} tegels selecteren`);
+  } else if (remaining === 0) {
+    setMessage('✅', 'Druk op CONFIRM om te bevestigen!');
+  } else {
+    setMessage('⚠️', `Te veel tegels geselecteerd (${-remaining} extra)`);
+  }
 }
 
 // ============================================
