@@ -117,6 +117,7 @@ class GameState:
         # Team info
         self.current_team: str = ""
         self.current_level: str = "easy"
+        self.score_submitted: bool = False  # Prevent duplicate score submissions
         
         self.games_played = 0
         self.high_score = 0
@@ -557,6 +558,7 @@ async def handle_frontend_message(msg: dict, websocket: WebSocket):
         state.game_phase = "idle"
         state.player_steps = []
         state.pattern = []
+        state.score_submitted = False  # Reset for new game
         print(f"→ New game registered: {state.current_team} ({state.current_level})")
         
         # Send confirmation to frontend
@@ -592,6 +594,9 @@ async def end_game_timeout():
     
     # Update stats
     state.games_played += 1
+    
+    # Submit score to database from backend (only once)
+    await submit_score_to_db()
     
     # Send game over event
     await broadcast_to_frontends({
@@ -845,6 +850,9 @@ async def end_game_wrong_selection():
     # Update stats
     state.games_played += 1
     
+    # Submit score to database from backend (only once)
+    await submit_score_to_db()
+    
     # Send single game_over event with all data
     await broadcast_to_frontends({
         "event": "game_over",
@@ -868,6 +876,39 @@ async def end_game_wrong_selection():
     state.selected_tiles = set()
 
 # ==================== HELPERS ====================
+async def submit_score_to_db():
+    """Submit score to Cosmos DB - only once per game"""
+    if state.score_submitted:
+        print("  Score already submitted, skipping...")
+        return False
+    
+    if not state.current_team or not state.current_team.strip():
+        print("  No team name, skipping score submission...")
+        return False
+    
+    if not cosmos_initialized:
+        print("  Cosmos DB not initialized, skipping score submission...")
+        return False
+    
+    try:
+        item = {
+            "id": str(uuid.uuid4()),
+            "team_name": state.current_team.strip(),
+            "score": state.current_score,
+            "level": state.current_level,
+            "rounds": state.round_number,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        container.create_item(body=item)
+        state.score_submitted = True
+        print(f"✓ Score saved: {state.current_team} - {state.current_score} ({state.current_level})")
+        return True
+        
+    except Exception as e:
+        print(f"✗ Error saving score: {e}")
+        return False
+
 async def broadcast_to_frontends(message: dict):
     """Send message to all connected frontends"""
     dead_connections = []

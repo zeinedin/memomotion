@@ -815,7 +815,7 @@ async function startGame() {
 
   // Set initial message based on mode
   const modeMessage = getModeStartMessage();
-  setMessage(modeConfig.icon, modeMessage);
+  setMessage(MODE_CONFIG[gameState.mode].icon, modeMessage);
 
   // Send game start to backend with mode
   sendMessage({
@@ -1283,15 +1283,8 @@ function handleGameOver(finalScore, rounds) {
       '<span class="title-icon">🎮</span> GAME OVER';
   }
 
-  // Submit score only once and only if team name is valid
-  if (
-    !gameState.scoreSubmitted &&
-    gameState.teamName &&
-    gameState.teamName.trim()
-  ) {
-    gameState.scoreSubmitted = true;
-    submitScore(gameState.teamName.trim(), finalScore, gameState.level, rounds);
-  }
+  // Score is now submitted from backend only - no duplicate submissions
+  gameState.scoreSubmitted = true;
 
   showScreen('gameOver');
 }
