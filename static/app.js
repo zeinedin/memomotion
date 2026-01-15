@@ -59,9 +59,9 @@ const MODE_CONFIG = {
 
 // Level Configuration
 const LEVEL_CONFIG = {
-  easy: { steps: 4, pointsPerRound: 10, label: 'Easy Mode' },
-  medium: { steps: 6, pointsPerRound: 15, label: 'Medium Mode' },
-  hard: { steps: 8, pointsPerRound: 25, label: 'Hard Mode' },
+  easy: { steps: 1, pointsPerRound: 10, label: 'Easy Mode' },
+  medium: { steps: 3, pointsPerRound: 15, label: 'Medium Mode' },
+  hard: { steps: 5, pointsPerRound: 25, label: 'Hard Mode' },
 };
 
 // WebSocket connection
@@ -504,6 +504,17 @@ function handleWebSocketMessage(message) {
         }
       }
       break;
+    case 'info':
+      // Info message from backend - display it
+      setMessage('ℹ️', msgData.message || 'Info');
+      break;
+    case 'game_registered':
+      // Game registration confirmed
+      setMessage(
+        '✅',
+        msgData.message || 'Game registered! Press START to begin!'
+      );
+      break;
     default:
       // Reduce console spam - only log truly unknown types
       if (!['tile_status'].includes(msgType)) {
@@ -617,24 +628,40 @@ function buildTileGrid() {
   // Sort tiles by ID for consistent display
   const sortedTiles = [...gameState.connectedTiles].sort((a, b) => a - b);
 
-  // Create tile elements dynamically
-  grid.innerHTML = sortedTiles
-    .map(
-      (tileId) => `
-        <div class="tile" data-tile-id="${tileId}" id="tile-${tileId}">
-            <span class="tile-number">${tileId}</span>
-        </div>
-    `
-    )
-    .join('');
+  // Check if tile list has changed (to avoid unnecessary rebuilds)
+  const existingTileIds = Array.from(grid.querySelectorAll('.tile'))
+    .map((t) => parseInt(t.dataset.tileId))
+    .sort((a, b) => a - b);
 
-  // Adjust grid columns based on tile count
-  const tileCount = sortedTiles.length;
-  let columns = Math.ceil(Math.sqrt(tileCount));
-  if (columns < 2) columns = 2;
-  if (columns > 6) columns = 6;
+  const tileListChanged =
+    JSON.stringify(sortedTiles) !== JSON.stringify(existingTileIds);
 
-  grid.style.gridTemplateColumns = `repeat(${columns}, minmax(80px, 1fr))`;
+  // Only rebuild if tile list changed
+  if (tileListChanged) {
+    // Save current selected state
+    const currentlySelected = new Set(gameState.selectedTiles);
+
+    // Create tile elements dynamically
+    grid.innerHTML = sortedTiles
+      .map(
+        (tileId) => `
+          <div class="tile${
+            currentlySelected.has(tileId) ? ' selected active' : ''
+          }" data-tile-id="${tileId}" id="tile-${tileId}">
+              <span class="tile-number">${tileId}</span>
+          </div>
+      `
+      )
+      .join('');
+
+    // Adjust grid columns based on tile count
+    const tileCount = sortedTiles.length;
+    let columns = Math.ceil(Math.sqrt(tileCount));
+    if (columns < 2) columns = 2;
+    if (columns > 6) columns = 6;
+
+    grid.style.gridTemplateColumns = `repeat(${columns}, minmax(80px, 1fr))`;
+  }
 }
 
 function handleTileConnected(tileId) {

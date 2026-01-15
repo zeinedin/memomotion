@@ -126,9 +126,9 @@ class GameState:
 
 # Level configurations
 LEVEL_CONFIG = {
-    "easy": {"pattern_length": 4, "points_per_tile": 10},
-    "medium": {"pattern_length": 6, "points_per_tile": 15},
-    "hard": {"pattern_length": 8, "points_per_tile": 25}
+    "easy": {"pattern_length": 1, "points_per_tile": 10},
+    "medium": {"pattern_length": 3, "points_per_tile": 15},
+    "hard": {"pattern_length": 5, "points_per_tile": 25}
 }
 
 state = GameState()
