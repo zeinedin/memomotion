@@ -400,8 +400,13 @@ async def frontend_websocket(websocket: WebSocket):
 
 async def handle_frontend_message(msg: dict, websocket: WebSocket):
     """Handle messages from frontend"""
-    event = msg.get("event")
+    # Handle both 'event' and 'type' formats from frontend
+    event = msg.get("event") or msg.get("type")
     data = msg.get("data", {})
+    
+    # If data is empty, use the message itself (flat format from frontend)
+    if not data:
+        data = msg
     
     if event == "request_state":
         # Send current state
@@ -415,16 +420,29 @@ async def handle_frontend_message(msg: dict, websocket: WebSocket):
         })
     
     elif event == "start_game":
-        # Register team and level
-        state.current_team = data.get("team_name", "Team")
-        state.current_level = data.get("level", "easy")
+        # Register team and level (handle both nested and flat formats)
+        state.current_team = data.get("team_name", msg.get("team_name", "Team"))
+        state.current_level = data.get("level", msg.get("level", "easy"))
         state.current_score = 0
         state.round_number = 0
-        print(f"→ New game: {state.current_team} ({state.current_level})")
+        state.game_phase = "idle"
+        state.player_steps = []
+        state.pattern = []
+        print(f"→ New game registered: {state.current_team} ({state.current_level})")
+        
+        # Send confirmation to frontend
+        await websocket.send_json({
+            "event": "game_registered",
+            "data": {
+                "team_name": state.current_team,
+                "level": state.current_level,
+                "message": "Press START on the master to begin!"
+            }
+        })
 
 # ==================== GAME LOGIC ====================
 async def handle_start_button():
-    """Handle START button press - two modes"""
+    """Handle START button press - starts a new round"""
     if not state.master_ws:
         print("✗ No master connected")
         return
@@ -439,12 +457,18 @@ async def handle_start_button():
         return
     
     if state.game_phase == "idle":
-        # First press: Show pattern
+        # Start a new round - show pattern
         await start_show_pattern(connected_tiles)
-    
     elif state.game_phase == "memorizing":
-        # Second press: Check pattern
-        await check_pattern()
+        # If pressed during memorizing phase, ignore (player should step on tiles)
+        print("  START pressed during memorizing - waiting for player steps")
+        await broadcast_to_frontends({
+            "event": "info",
+            "data": {"message": "Step on the tiles in the correct order!"}
+        })
+    else:
+        # In any other phase, ignore
+        print(f"  START pressed during {state.game_phase} - ignoring")
 
 async def start_show_pattern(connected_tiles: List[int]):
     """Generate and show pattern"""
@@ -475,13 +499,14 @@ async def start_show_pattern(connected_tiles: List[int]):
     })
     
     # Tell master to show pattern on tiles
-    await state.master_ws.send_json({
-        "event": "show_pattern",
-        "data": {
-            "pattern": state.pattern,
-            "duration": 800
-        }
-    })
+    if state.master_ws:
+        await state.master_ws.send_json({
+            "event": "show_pattern",
+            "data": {
+                "pattern": state.pattern,
+                "duration": 800
+            }
+        })
     
     # After pattern shown, enter memorizing phase
     await asyncio.sleep(pattern_length * 1.2 + 1)
@@ -497,7 +522,11 @@ async def start_show_pattern(connected_tiles: List[int]):
 
 async def handle_player_step(data: dict):
     """Player stepped on a tile"""
-    tile_id = data["tile_id"]
+    tile_id = data.get("tile_id")
+    
+    if tile_id is None:
+        print("  Step ignored (no tile_id)")
+        return
     
     if state.game_phase != "memorizing":
         print(f"  Step ignored (wrong phase: {state.game_phase})")
@@ -507,38 +536,105 @@ async def handle_player_step(data: dict):
     
     # Record step
     state.player_steps.append(tile_id)
+    current_step = len(state.player_steps)
+    expected_steps = len(state.pattern)
+    
+    # Check if current step is correct (real-time validation)
+    is_correct = state.player_steps[current_step - 1] == state.pattern[current_step - 1]
     
     # Send to frontend to show
     await broadcast_to_frontends({
         "event": "player_stepped",
         "data": {
             "tile_id": tile_id,
-            "step_number": len(state.player_steps),
+            "step_number": current_step,
+            "expected_steps": expected_steps,
+            "is_correct": is_correct,
             "steps_so_far": state.player_steps
         }
     })
     
     # Tell master to light up tile
-    await state.master_ws.send_json({
-        "event": "light_tile",
+    if state.master_ws:
+        await state.master_ws.send_json({
+            "event": "light_tile",
+            "data": {
+                "tile_id": tile_id,
+                "on": True
+            }
+        })
+    
+    # If wrong step, end game immediately
+    if not is_correct:
+        print(f"✗ WRONG STEP! Expected: {state.pattern[current_step - 1]}, Got: {tile_id}")
+        await asyncio.sleep(0.5)  # Brief pause to show the error
+        await end_game_wrong()
+        return
+    
+    # If all steps are correct and complete, auto-check
+    if current_step >= expected_steps:
+        print(f"✓ All {expected_steps} steps received correctly!")
+        await asyncio.sleep(0.5)  # Brief pause before showing success
+        await check_pattern()
+
+async def end_game_wrong():
+    """End the game when player makes a wrong step"""
+    print("→ Wrong step - ending game...")
+    state.game_phase = "checking"
+    
+    # Turn off all tiles
+    if state.master_ws:
+        await state.master_ws.send_json({
+            "event": "end_game",
+            "data": {}
+        })
+    
+    # Update stats
+    state.games_played += 1
+    
+    # Notify frontend
+    await broadcast_to_frontends({
+        "event": "pattern_wrong",
         "data": {
-            "tile_id": tile_id,
-            "on": True
+            "message": "❌ Fout! Game Over",
+            "expected": state.pattern,
+            "player_steps": state.player_steps,
+            "score": state.current_score,
+            "round": state.round_number
         }
     })
+    
+    # Wait then send game ended
+    await asyncio.sleep(2)
+    
+    await broadcast_to_frontends({
+        "event": "game_ended",
+        "data": {
+            "score": state.current_score,
+            "high_score": state.high_score,
+            "games_played": state.games_played,
+            "rounds": state.round_number
+        }
+    })
+    
+    # Reset state
+    state.game_phase = "idle"
+    state.player_steps = []
+    state.pattern = []
 
 async def check_pattern():
-    """Check if player's pattern is correct"""
+    """Check if player's pattern is correct - called when all steps are received"""
     print("→ Checking pattern...")
     state.game_phase = "checking"
     
     # Turn off all tiles
-    await state.master_ws.send_json({
-        "event": "end_game",
-        "data": {}
-    })
+    if state.master_ws:
+        await state.master_ws.send_json({
+            "event": "end_game",
+            "data": {}
+        })
     
-    # Check correctness
+    # Pattern should already be verified step-by-step, but double check
     correct = state.player_steps == state.pattern
     
     # Get points from level config
@@ -557,52 +653,24 @@ async def check_pattern():
             "data": {
                 "message": "🎉 Perfect!",
                 "score": state.current_score,
+                "round": state.round_number,
                 "points_earned": points,
                 "pattern": state.pattern,
                 "player_steps": state.player_steps
             }
         })
-    else:
-        print(f"✗ WRONG! Expected: {state.pattern}, Got: {state.player_steps}")
         
-        await broadcast_to_frontends({
-            "event": "pattern_wrong",
-            "data": {
-                "message": "❌ Fout! Game Over",
-                "expected": state.pattern,
-                "player_steps": state.player_steps,
-                "score": state.current_score
-            }
-        })
-    
-    # Update stats
-    state.games_played += 1
-    
-    # Wait then reset or continue
-    await asyncio.sleep(3)
-    
-    if correct:
-        # Continue to next round
-        connected_tiles = [tid for tid, info in state.tiles.items() if info["connected"]]
+        # Wait then reset for next round
+        await asyncio.sleep(2)
+        
+        # Reset for next round (keep score and round number)
         state.game_phase = "idle"
         state.player_steps = []
         state.pattern = []
         # Don't auto-start, wait for START button
     else:
-        # Game over
-        state.game_phase = "idle"
-        state.player_steps = []
-        state.pattern = []
-        
-        await broadcast_to_frontends({
-            "event": "game_ended",
-            "data": {
-                "score": state.current_score,
-                "high_score": state.high_score,
-                "games_played": state.games_played,
-                "rounds": state.round_number
-            }
-        })
+        # This shouldn't happen with real-time validation, but handle just in case
+        await end_game_wrong()
 
 # ==================== HELPERS ====================
 async def broadcast_to_frontends(message: dict):

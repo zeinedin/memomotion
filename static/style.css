@@ -617,6 +617,30 @@ body {
     opacity: 1;
 }
 
+.mode-btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+    filter: grayscale(50%);
+}
+
+.mode-btn.disabled:hover {
+    transform: none;
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.mode-btn.disabled .mode-glow {
+    opacity: 0 !important;
+}
+
+.coming-soon-badge {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 1rem;
+    z-index: 2;
+}
+
 .mode-icon {
     font-size: 2rem;
     z-index: 1;
@@ -1296,6 +1320,46 @@ body {
     background: rgba(255, 255, 255, 0.1);
     border: 2px dashed rgba(255, 255, 255, 0.3);
     color: var(--text-muted);
+}
+
+.step-box.correct {
+    background: var(--gradient-success);
+    color: var(--bg-dark);
+    animation: correctPulse 0.5s ease;
+}
+
+.step-box.wrong {
+    background: var(--gradient-danger);
+    color: white;
+    animation: wrongShake 0.5s ease;
+}
+
+@keyframes correctPulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.1);
+    }
+}
+
+@keyframes wrongShake {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    25% {
+        transform: translateX(-5px);
+    }
+
+    75% {
+        transform: translateX(5px);
+    }
 }
 
 @keyframes boxAppear {

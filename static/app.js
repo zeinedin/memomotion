@@ -133,9 +133,13 @@ function cacheElements() {
 }
 
 function setupEventListeners() {
-  // Mode selection
+  // Mode selection - only allow classic mode, others are disabled
   elements.modeBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
+      // Skip if disabled (coming soon modes)
+      if (btn.classList.contains('disabled') || btn.disabled) {
+        return;
+      }
       elements.modeBtns.forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       gameState.mode = btn.dataset.mode;
@@ -350,6 +354,25 @@ function handleWebSocketMessage(message) {
         msgData.score || message.score
       );
       break;
+    case 'pattern_correct':
+      // Pattern was correct - update score and prepare for next round
+      gameState.score = msgData.score || message.score || gameState.score;
+      gameState.round = msgData.round || message.round || gameState.round;
+      updateGameStats();
+      setMessage(
+        '🎉',
+        msgData.message || 'Perfect! Get ready for the next round!'
+      );
+      // Clear tile states
+      setTimeout(() => {
+        document.querySelectorAll('.tile').forEach((tile) => {
+          tile.classList.remove('step', 'pattern', 'correct');
+        });
+        elements.sequenceSection.classList.remove('visible');
+        elements.stepsSection.classList.remove('visible');
+        setMessage('🎮', 'Press START on the master for the next round!');
+      }, 2000);
+      break;
     case 'game_over':
       handleGameOver(
         msgData.final_score || message.final_score,
@@ -410,11 +433,38 @@ function handleWebSocketMessage(message) {
       console.log('🎯 Tile pressed:', msgData.tile_id);
       handleTileActivated(msgData.tile_id || message.tile_id);
       // Update step count if available
-      if (msgData.step_number) {
-        setMessage(
-          '👆',
-          `Step ${msgData.step_number} - Tile ${msgData.tile_id}`
-        );
+      if (msgData.step_number !== undefined) {
+        const stepNum = msgData.step_number;
+        const tileId = msgData.tile_id || message.tile_id;
+        const isCorrect = msgData.is_correct !== false; // Default to true if not specified
+
+        // Update step boxes in the UI
+        const stepBoxes = elements.stepsGrid.querySelectorAll('.step-box');
+        if (stepBoxes[stepNum - 1]) {
+          stepBoxes[stepNum - 1].classList.remove('waiting');
+          stepBoxes[stepNum - 1].textContent = tileId;
+          if (isCorrect) {
+            stepBoxes[stepNum - 1].classList.add('correct');
+          } else {
+            stepBoxes[stepNum - 1].classList.add('wrong');
+          }
+        }
+
+        // Highlight tile on grid
+        const tile = document.getElementById(`tile-${tileId}`);
+        if (tile) {
+          if (isCorrect) {
+            tile.classList.add('step', 'correct');
+          } else {
+            tile.classList.add('step', 'wrong');
+          }
+        }
+
+        if (isCorrect) {
+          setMessage('✅', `Step ${stepNum} correct!`);
+        } else {
+          setMessage('❌', `Wrong tile! Game Over!`);
+        }
       }
       break;
     default:
