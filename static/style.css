@@ -1178,10 +1178,30 @@ body {
     opacity: 1;
 }
 
+/* Offline tile - not connected to the system */
 .tile.offline {
-    opacity: 0.3;
-    background: rgba(255, 0, 68, 0.1);
-    border-color: rgba(255, 0, 68, 0.3);
+    opacity: 0.4;
+    background: rgba(50, 50, 60, 0.3);
+    border-color: rgba(100, 100, 120, 0.3);
+    pointer-events: none;
+    cursor: not-allowed;
+    position: relative;
+}
+
+.tile.offline .tile-number {
+    opacity: 0.5;
+}
+
+.tile-offline-label {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255, 100, 100, 0.7);
+    font-family: var(--font-display);
 }
 
 .tile.active {

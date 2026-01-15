@@ -14,7 +14,7 @@ const gameState = {
   playerSteps: [],
   selectedTiles: new Set(), // Tiles currently selected by player (toggle mode)
   connectedTiles: [],
-  expectedTiles: 0,
+  // expectedTiles removed - always 16 tiles
   masterConnected: false,
   isPlaying: false,
   isSelectingPhase: false, // True during tile selection phase
@@ -100,6 +100,8 @@ document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
   connectWebSocket();
   loadLeaderboard();
+  // Build 16-tile grid immediately (all offline until connected)
+  buildTileGrid();
 });
 
 function cacheElements() {
@@ -333,7 +335,7 @@ function handleWebSocketMessage(message) {
         const connectedTiles = tileIds.filter(
           (id) => msgData.tiles[id]?.connected
         );
-        updateTileStatus(connectedTiles, tileIds.length);
+        updateTileStatus(connectedTiles);
       }
       break;
     case 'status':
@@ -346,12 +348,9 @@ function handleWebSocketMessage(message) {
         const connectedTiles = tileIds.filter(
           (id) => msgData.tiles[id]?.connected
         );
-        updateTileStatus(connectedTiles, tileIds.length);
+        updateTileStatus(connectedTiles);
       } else {
-        updateTileStatus(
-          msgData.connected_tiles || message.connected_tiles,
-          msgData.expected_tiles || message.expected_tiles
-        );
+        updateTileStatus(msgData.connected_tiles || message.connected_tiles);
       }
       break;
     case 'tile_connected':
@@ -561,10 +560,7 @@ function handleStatusUpdate(data) {
   }
 
   if (statusData.connected_tiles) {
-    updateTileStatus(
-      statusData.connected_tiles,
-      statusData.expected_tiles || 0
-    );
+    updateTileStatus(statusData.connected_tiles);
   }
 
   if (statusData.tiles) {
@@ -572,7 +568,7 @@ function handleStatusUpdate(data) {
     const connectedTiles = tileIds.filter(
       (id) => statusData.tiles[id]?.connected
     );
-    updateTileStatus(connectedTiles, tileIds.length);
+    updateTileStatus(connectedTiles);
   }
 }
 
@@ -606,23 +602,23 @@ function updateMasterStatus() {
 // DYNAMIC TILE GRID
 // ============================================
 
-function updateTileStatus(connectedTiles, expectedTiles) {
-  console.log('🎯 updateTileStatus called:', { connectedTiles, expectedTiles });
+function updateTileStatus(connectedTiles) {
+  console.log('🎯 updateTileStatus called:', { connectedTiles });
 
   gameState.connectedTiles = connectedTiles || [];
-  gameState.expectedTiles = expectedTiles || gameState.connectedTiles.length;
+  const TOTAL_TILES = 16; // Always expect 16 tiles
 
-  // Update status display
+  // Update status display - show connected out of 16
   const connected = gameState.connectedTiles.length;
-  const expected = Math.max(gameState.expectedTiles, connected);
 
-  console.log(`🎯 Tiles: ${connected}/${expected}`);
-  elements.tilesStatus.textContent = `Tiles: ${connected}/${expected}`;
+  console.log(`🎯 Tiles: ${connected}/${TOTAL_TILES}`);
+  elements.tilesStatus.textContent = `Tiles: ${connected}/${TOTAL_TILES}`;
 
-  if (connected > 0 && connected >= expected) {
+  if (connected > 0 && connected >= TOTAL_TILES) {
     elements.tilesDot.classList.add('connected');
   } else if (connected > 0) {
-    elements.tilesDot.classList.remove('connected');
+    // Partial connection - show yellow/warning state
+    elements.tilesDot.classList.add('connected');
   } else {
     elements.tilesDot.classList.remove('connected');
   }
@@ -634,68 +630,87 @@ function updateTileStatus(connectedTiles, expectedTiles) {
   if (gameState.masterConnected && connected > 0) {
     setMessage(
       '🎮',
-      `${connected} tiles ready! Press START on the master to begin!`
+      `${connected}/${TOTAL_TILES} tiles online! Press START on the master to begin!`
     );
   }
 }
 
 function buildTileGrid() {
   const grid = elements.tileGrid;
+  const TOTAL_TILES = 16; // Always show 16 tiles
+  const connectedSet = new Set(gameState.connectedTiles);
 
-  // If no tiles connected, show waiting message
-  if (gameState.connectedTiles.length === 0) {
-    grid.innerHTML = `
-            <div class="no-tiles-message">
-                <span class="no-tiles-icon">📡</span>
-                <p>Waiting for tiles to connect...</p>
-            </div>
-        `;
-    return;
-  }
+  // Create array of all 16 tile IDs (1-16)
+  const allTiles = Array.from({ length: TOTAL_TILES }, (_, i) => i + 1);
 
-  // Sort tiles by ID for consistent display
-  const sortedTiles = [...gameState.connectedTiles].sort((a, b) => a - b);
-
-  // Check if tile list has changed (to avoid unnecessary rebuilds)
+  // Check if tile list display needs update
   const existingTileIds = Array.from(grid.querySelectorAll('.tile'))
     .map((t) => parseInt(t.dataset.tileId))
     .sort((a, b) => a - b);
 
-  const tileListChanged =
-    JSON.stringify(sortedTiles) !== JSON.stringify(existingTileIds);
+  const needsRebuild =
+    existingTileIds.length !== TOTAL_TILES ||
+    JSON.stringify(allTiles) !== JSON.stringify(existingTileIds);
 
-  // Only rebuild if tile list changed
-  if (tileListChanged) {
+  if (needsRebuild) {
     // Save current selected state
     const currentlySelected = new Set(gameState.selectedTiles);
 
-    // Create tile elements dynamically
-    grid.innerHTML = sortedTiles
-      .map(
-        (tileId) => `
-          <div class="tile${
-            currentlySelected.has(tileId) ? ' selected active' : ''
-          }" data-tile-id="${tileId}" id="tile-${tileId}">
+    // Create all 16 tile elements - mark offline tiles differently
+    grid.innerHTML = allTiles
+      .map((tileId) => {
+        const isConnected = connectedSet.has(tileId);
+        const isSelected = currentlySelected.has(tileId);
+
+        let classes = 'tile';
+        if (!isConnected) classes += ' offline';
+        if (isSelected && isConnected) classes += ' selected active';
+
+        return `
+          <div class="${classes}" data-tile-id="${tileId}" id="tile-${tileId}">
               <span class="tile-number">${tileId}</span>
+              ${
+                !isConnected
+                  ? '<span class="tile-offline-label">offline</span>'
+                  : ''
+              }
           </div>
-      `
-      )
+        `;
+      })
       .join('');
 
-    // Adjust grid columns based on tile count
-    const tileCount = sortedTiles.length;
-    let columns = Math.ceil(Math.sqrt(tileCount));
-    if (columns < 2) columns = 2;
-    if (columns > 6) columns = 6;
-
-    grid.style.gridTemplateColumns = `repeat(${columns}, minmax(80px, 1fr))`;
+    // Fixed 4x4 grid for 16 tiles
+    grid.style.gridTemplateColumns = 'repeat(4, minmax(80px, 1fr))';
+  } else {
+    // Just update the connected/offline status without full rebuild
+    allTiles.forEach((tileId) => {
+      const tile = document.getElementById(`tile-${tileId}`);
+      if (tile) {
+        const isConnected = connectedSet.has(tileId);
+        if (isConnected) {
+          tile.classList.remove('offline');
+          // Remove offline label if exists
+          const label = tile.querySelector('.tile-offline-label');
+          if (label) label.remove();
+        } else {
+          tile.classList.add('offline');
+          // Add offline label if not exists
+          if (!tile.querySelector('.tile-offline-label')) {
+            const label = document.createElement('span');
+            label.className = 'tile-offline-label';
+            label.textContent = 'offline';
+            tile.appendChild(label);
+          }
+        }
+      }
+    });
   }
 }
 
 function handleTileConnected(tileId) {
   if (!gameState.connectedTiles.includes(tileId)) {
     gameState.connectedTiles.push(tileId);
-    updateTileStatus(gameState.connectedTiles, gameState.expectedTiles);
+    updateTileStatus(gameState.connectedTiles);
   }
 }
 
@@ -703,7 +718,7 @@ function handleTileDisconnected(tileId) {
   const index = gameState.connectedTiles.indexOf(tileId);
   if (index > -1) {
     gameState.connectedTiles.splice(index, 1);
-    updateTileStatus(gameState.connectedTiles, gameState.expectedTiles);
+    updateTileStatus(gameState.connectedTiles);
   }
 }
 
