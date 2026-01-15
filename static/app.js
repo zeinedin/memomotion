@@ -989,7 +989,9 @@ async function loadLeaderboard() {
     }
     const data = await response.json();
     // Handle both array and object response formats
-    const entries = Array.isArray(data) ? data : (data.leaderboard || data.entries || []);
+    const entries = Array.isArray(data)
+      ? data
+      : data.leaderboard || data.entries || [];
     renderLeaderboard(elements.leaderboardPreview, entries, true);
   } catch (error) {
     console.error('Failed to load leaderboard:', error.message);
@@ -1007,7 +1009,9 @@ async function loadFullLeaderboard() {
     const response = await fetch('/api/leaderboard?limit=50');
     const data = await response.json();
     // Handle both array and object response formats
-    const entries = Array.isArray(data) ? data : (data.leaderboard || data.entries || []);
+    const entries = Array.isArray(data)
+      ? data
+      : data.leaderboard || data.entries || [];
     renderLeaderboard(elements.leaderboardFull, entries, false);
   } catch (error) {
     console.error('Failed to load full leaderboard:', error);
