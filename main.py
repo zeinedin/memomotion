@@ -755,11 +755,17 @@ async def handle_confirm_button():
             })
         
         # Reset for next round (keep score and round number)
-        state.game_phase = "idle"
         state.player_steps = []
         state.pattern = []
         state.selected_tiles = set()
-        # Don't auto-start, wait for START button
+        
+        # Automatically start next round
+        connected_tiles = [tid for tid, info in state.tiles.items() if info["connected"]]
+        if len(connected_tiles) >= 2:
+            await asyncio.sleep(1)  # Brief pause before next round
+            await start_show_pattern(connected_tiles)
+        else:
+            state.game_phase = "idle"
     else:
         print(f"✗ WRONG SELECTION!")
         print(f"  Missing: {pattern_set - state.selected_tiles}")

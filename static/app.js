@@ -394,7 +394,7 @@ function handleWebSocketMessage(message) {
         });
         elements.sequenceSection.classList.remove('visible');
         elements.stepsSection.classList.remove('visible');
-        setMessage('🎮', 'Press START on the master for the next round!');
+        setMessage('🎮', 'Next round starting...');
       }, 2000);
       break;
     case 'game_over':
@@ -725,11 +725,11 @@ async function startGame() {
     errorElement.style.display = 'none';
   }
 
-  if (!teamName) {
+  if (!teamName || teamName.length < 2) {
     elements.teamNameInput.focus();
     elements.teamNameInput.style.borderColor = 'var(--neon-red)';
     if (errorElement) {
-      errorElement.textContent = 'Please enter a team name';
+      errorElement.textContent = 'Please enter a team name (min. 2 characters)';
       errorElement.style.display = 'block';
     }
     setTimeout(() => {
@@ -740,10 +740,12 @@ async function startGame() {
 
   // Check if team name already exists
   try {
+    console.log('Checking if team name exists:', teamName);
     const response = await fetch(
       `/api/leaderboard/check-name?name=${encodeURIComponent(teamName)}`
     );
     const data = await response.json();
+    console.log('Team name check result:', data);
 
     if (data.exists) {
       elements.teamNameInput.focus();
