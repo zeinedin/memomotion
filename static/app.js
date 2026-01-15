@@ -988,7 +988,9 @@ async function loadLeaderboard() {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     const data = await response.json();
-    renderLeaderboard(elements.leaderboardPreview, data, true);
+    // Handle both array and object response formats
+    const entries = Array.isArray(data) ? data : (data.leaderboard || data.entries || []);
+    renderLeaderboard(elements.leaderboardPreview, entries, true);
   } catch (error) {
     console.error('Failed to load leaderboard:', error.message);
     if (elements.leaderboardPreview) {
@@ -1004,7 +1006,9 @@ async function loadFullLeaderboard() {
       '<div class="loading-spinner"><div class="spinner"></div><span>Loading...</span></div>';
     const response = await fetch('/api/leaderboard?limit=50');
     const data = await response.json();
-    renderLeaderboard(elements.leaderboardFull, data, false);
+    // Handle both array and object response formats
+    const entries = Array.isArray(data) ? data : (data.leaderboard || data.entries || []);
+    renderLeaderboard(elements.leaderboardFull, entries, false);
   } catch (error) {
     console.error('Failed to load full leaderboard:', error);
     elements.leaderboardFull.innerHTML =
