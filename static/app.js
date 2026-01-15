@@ -60,11 +60,33 @@ const MODE_CONFIG = {
 };
 
 // Level Configuration
+// Scoring: correct = (round * level_multiplier * 10) + base_points
+// Wrong = -15 penalty
 const LEVEL_CONFIG = {
-  easy: { steps: 1, pointsPerRound: 10, label: 'Easy Mode' },
-  medium: { steps: 3, pointsPerRound: 15, label: 'Medium Mode' },
-  hard: { steps: 5, pointsPerRound: 25, label: 'Hard Mode' },
+  easy: {
+    steps: 1,
+    levelMultiplier: 1,
+    basePoints: 20,
+    timeLimit: 30,
+    label: 'Easy Mode',
+  },
+  medium: {
+    steps: 3,
+    levelMultiplier: 2,
+    basePoints: 30,
+    timeLimit: 25,
+    label: 'Medium Mode',
+  },
+  hard: {
+    steps: 5,
+    levelMultiplier: 3,
+    basePoints: 50,
+    timeLimit: 20,
+    label: 'Hard Mode',
+  },
 };
+
+const WRONG_PENALTY = 15;
 
 // WebSocket connection
 let socket = null;
@@ -372,15 +394,13 @@ function handleWebSocketMessage(message) {
       break;
     case 'pattern_correct':
       // Pattern was correct - update score and prepare for next round
+      stopTimer(); // Stop the selection timer
       gameState.score = msgData.score || message.score || gameState.score;
       gameState.round = msgData.round || message.round || gameState.round;
       gameState.isSelectingPhase = false;
       gameState.selectedTiles = new Set();
       updateGameStats();
-      setMessage(
-        '🎉',
-        msgData.message || 'Perfect! Get ready for the next round!'
-      );
+      setMessage('🎉', msgData.message || 'Perfect!');
       // Clear tile states
       setTimeout(() => {
         document.querySelectorAll('.tile').forEach((tile) => {
@@ -398,9 +418,11 @@ function handleWebSocketMessage(message) {
       }, 2000);
       break;
     case 'game_over':
+      // Single game over event - show message and handle game over
+      setMessage('❌', msgData.message || 'Game Over!');
       handleGameOver(
-        msgData.final_score || message.final_score,
-        msgData.rounds || message.rounds
+        msgData.final_score ?? msgData.score ?? gameState.score,
+        msgData.rounds ?? msgData.round ?? gameState.round
       );
       break;
     case 'waiting_for_start':
@@ -408,15 +430,18 @@ function handleWebSocketMessage(message) {
       break;
     case 'game_started':
       gameState.isPlaying = true;
-      gameState.round = msgData.round || 0;
-      gameState.score = 0;
+      gameState.round = msgData.round || gameState.round || 0;
+      // Only reset score on first round (round 1)
+      if (msgData.round === 1) {
+        gameState.score = 0;
+      }
       gameState.selectedTiles = new Set();
       gameState.isSelectingPhase = false;
       updateGameStats();
 
       // Check if pattern should be shown simultaneously
       if (msgData.display_mode === 'simultaneous' && msgData.pattern) {
-        setMessage('🧠', msgData.message || 'Onthoud deze tegels!');
+        setMessage('🧠', msgData.message || `Ronde ${msgData.round}`);
         showPatternSimultaneous(msgData.pattern);
       } else {
         setMessage('🚀', msgData.message || 'Game Started! Get ready...');
@@ -430,6 +455,10 @@ function handleWebSocketMessage(message) {
       startSelectingPhase(
         msgData.pattern_length || LEVEL_CONFIG[gameState.level].steps
       );
+      // Start timer for selecting phase
+      const timeLimit =
+        msgData.time_limit || LEVEL_CONFIG[gameState.level].timeLimit || 30;
+      startTimer(timeLimit);
       break;
     case 'tile_toggled':
       // A tile was toggled on/off
@@ -458,19 +487,14 @@ function handleWebSocketMessage(message) {
       }
       break;
     case 'pattern_wrong':
-      // Player made a mistake
-      setMessage('❌', msgData.message || 'Wrong! Game Over!');
-      handleGameOver(
-        msgData.score || gameState.score,
-        msgData.round || gameState.round
+      // Legacy event - redirect to game_over handling
+      console.log(
+        'pattern_wrong received, but game_over should handle this now'
       );
       break;
     case 'game_ended':
-      // Game has ended
-      handleGameOver(
-        msgData.score || gameState.score,
-        msgData.rounds || gameState.round
-      );
+      // Legacy event - redirect to game_over handling
+      console.log('game_ended received, but game_over should handle this now');
       break;
     case 'player_input_phase':
       // Player's turn to repeat the pattern
@@ -780,12 +804,9 @@ async function startGame() {
   elements.currentMode.textContent = MODE_CONFIG[gameState.mode].name;
   updateGameStats();
 
-  // Show/hide timer based on mode
-  const modeConfig = MODE_CONFIG[gameState.mode];
-  if (modeConfig.hasTimer && elements.timerDisplay) {
-    elements.timerDisplay.style.display = 'flex';
-  } else if (elements.timerDisplay) {
-    elements.timerDisplay.style.display = 'none';
+  // Timer will be shown during selecting phase (startTimer handles display)
+  if (elements.timerDisplay) {
+    elements.timerDisplay.style.display = 'none'; // Hidden until selecting phase
   }
 
   // Hide pattern sections initially

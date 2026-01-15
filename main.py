@@ -125,11 +125,15 @@ class GameState:
         self.start_time = None
 
 # Level configurations
+# Scoring: correct = round_number * level_multiplier * 10
+# Wrong = -15 penalty (but score cannot go below 0)
 LEVEL_CONFIG = {
-    "easy": {"pattern_length": 1, "points_per_tile": 10},
-    "medium": {"pattern_length": 3, "points_per_tile": 15},
-    "hard": {"pattern_length": 5, "points_per_tile": 25}
+    "easy": {"pattern_length": 1, "level_multiplier": 1, "base_points": 20, "time_limit": 30},
+    "medium": {"pattern_length": 3, "level_multiplier": 2, "base_points": 30, "time_limit": 25},
+    "hard": {"pattern_length": 5, "level_multiplier": 3, "base_points": 50, "time_limit": 20}
 }
+
+WRONG_PENALTY = 15  # Points deducted for wrong answer
 
 state = GameState()
 
@@ -327,14 +331,12 @@ async def get_config():
     """Get current game configuration"""
     return {
         "levels": {
-            "easy": {"steps": LEVEL_CONFIG["easy"]["pattern_length"], "points": LEVEL_CONFIG["easy"]["points_per_tile"]},
-            "medium": {"steps": LEVEL_CONFIG["medium"]["pattern_length"], "points": LEVEL_CONFIG["medium"]["points_per_tile"]},
-            "hard": {"steps": LEVEL_CONFIG["hard"]["pattern_length"], "points": LEVEL_CONFIG["hard"]["points_per_tile"]}
+            "easy": {"steps": LEVEL_CONFIG["easy"]["pattern_length"], "multiplier": LEVEL_CONFIG["easy"]["level_multiplier"], "base": LEVEL_CONFIG["easy"]["base_points"]},
+            "medium": {"steps": LEVEL_CONFIG["medium"]["pattern_length"], "multiplier": LEVEL_CONFIG["medium"]["level_multiplier"], "base": LEVEL_CONFIG["medium"]["base_points"]},
+            "hard": {"steps": LEVEL_CONFIG["hard"]["pattern_length"], "multiplier": LEVEL_CONFIG["hard"]["level_multiplier"], "base": LEVEL_CONFIG["hard"]["base_points"]}
         },
-        "speedRun": {
-            "timePerStep": 3,
-            "bonusPerSecond": 2
-        }
+        "wrongPenalty": WRONG_PENALTY,
+        "scoringFormula": "points = (round * level_multiplier * 10) + base_points"
     }
 
 @app.post("/api/admin/config/levels")
@@ -343,14 +345,17 @@ async def update_level_config(config: dict):
     global LEVEL_CONFIG
     
     if "easy" in config:
-        LEVEL_CONFIG["easy"]["pattern_length"] = config["easy"].get("steps", 4)
-        LEVEL_CONFIG["easy"]["points_per_tile"] = config["easy"].get("points", 10)
+        LEVEL_CONFIG["easy"]["pattern_length"] = config["easy"].get("steps", 1)
+        LEVEL_CONFIG["easy"]["level_multiplier"] = config["easy"].get("multiplier", 1)
+        LEVEL_CONFIG["easy"]["base_points"] = config["easy"].get("base", 20)
     if "medium" in config:
-        LEVEL_CONFIG["medium"]["pattern_length"] = config["medium"].get("steps", 6)
-        LEVEL_CONFIG["medium"]["points_per_tile"] = config["medium"].get("points", 15)
+        LEVEL_CONFIG["medium"]["pattern_length"] = config["medium"].get("steps", 3)
+        LEVEL_CONFIG["medium"]["level_multiplier"] = config["medium"].get("multiplier", 2)
+        LEVEL_CONFIG["medium"]["base_points"] = config["medium"].get("base", 30)
     if "hard" in config:
-        LEVEL_CONFIG["hard"]["pattern_length"] = config["hard"].get("steps", 8)
-        LEVEL_CONFIG["hard"]["points_per_tile"] = config["hard"].get("points", 25)
+        LEVEL_CONFIG["hard"]["pattern_length"] = config["hard"].get("steps", 5)
+        LEVEL_CONFIG["hard"]["level_multiplier"] = config["hard"].get("multiplier", 3)
+        LEVEL_CONFIG["hard"]["base_points"] = config["hard"].get("base", 50)
     
     print(f"✓ Level config updated: {LEVEL_CONFIG}")
     return {"status": "ok", "config": LEVEL_CONFIG}
@@ -563,6 +568,52 @@ async def handle_frontend_message(msg: dict, websocket: WebSocket):
                 "message": "Press START on the master to begin!"
             }
         })
+    
+    elif event == "timeout":
+        # Player ran out of time
+        print(f"→ Timeout received from frontend")
+        if state.game_phase == "selecting":
+            await end_game_timeout()
+
+async def end_game_timeout():
+    """End the game when player runs out of time"""
+    print("→ Time's up - ending game...")
+    state.game_phase = "game_over"
+    
+    # Apply penalty (score can't go below 0)
+    state.current_score = max(0, state.current_score - WRONG_PENALTY)
+    
+    # Turn off all tiles
+    if state.master_ws:
+        await state.master_ws.send_json({
+            "event": "end_game",
+            "data": {}
+        })
+    
+    # Update stats
+    state.games_played += 1
+    
+    # Send game over event
+    await broadcast_to_frontends({
+        "event": "game_over",
+        "data": {
+            "message": "⏰ Tijd is op! Game Over",
+            "expected": state.pattern,
+            "selected_tiles": list(state.selected_tiles),
+            "final_score": state.current_score,
+            "rounds": state.round_number,
+            "team_name": state.current_team,
+            "level": state.current_level,
+            "timeout": True
+        }
+    })
+    
+    # Reset state
+    await asyncio.sleep(2)
+    state.game_phase = "idle"
+    state.player_steps = []
+    state.pattern = []
+    state.selected_tiles = set()
 
 # ==================== GAME LOGIC ====================
 async def handle_start_button():
@@ -615,7 +666,7 @@ async def start_show_pattern(connected_tiles: List[int]):
         "data": {
             "phase": "showing_pattern",
             "pattern": state.pattern,
-            "message": "Onthoud deze tegels! (8 seconden)",
+            "message": f"Ronde {state.round_number}",
             "round": state.round_number,
             "display_mode": "simultaneous"  # New flag for simultaneous display
         }
@@ -648,7 +699,8 @@ async def start_show_pattern(connected_tiles: List[int]):
         "event": "selecting_phase",
         "data": {
             "pattern_length": len(state.pattern),
-            "message": "Selecteer de juiste tegels en druk op CONFIRM!"
+            "time_limit": level_config.get("time_limit", 30),
+            "message": "Selecteer de juiste tegels!"
         }
     })
 
@@ -714,11 +766,14 @@ async def handle_confirm_button():
     pattern_set = set(state.pattern)
     correct = state.selected_tiles == pattern_set
     
-    # Get points from level config
+    # Get level config for scoring
     level_config = LEVEL_CONFIG.get(state.current_level, LEVEL_CONFIG["easy"])
     
     if correct:
-        points = len(state.pattern) * level_config["points_per_tile"]
+        # Scoring: round_number * level_multiplier * 10 + base_points
+        # e.g., Round 1 Easy: 1 * 1 * 10 + 20 = 30 points
+        # e.g., Round 3 Hard: 3 * 3 * 10 + 50 = 140 points
+        points = (state.round_number * level_config["level_multiplier"] * 10) + level_config["base_points"]
         state.current_score += points
         if state.current_score > state.high_score:
             state.high_score = state.current_score
@@ -775,7 +830,10 @@ async def handle_confirm_button():
 async def end_game_wrong_selection():
     """End the game when player selects wrong tiles"""
     print("→ Wrong selection - ending game...")
-    state.game_phase = "checking"
+    state.game_phase = "game_over"
+    
+    # Apply penalty (score can't go below 0)
+    state.current_score = max(0, state.current_score - WRONG_PENALTY)
     
     # Turn off all tiles
     if state.master_ws:
@@ -787,32 +845,23 @@ async def end_game_wrong_selection():
     # Update stats
     state.games_played += 1
     
-    # Notify frontend
+    # Send single game_over event with all data
     await broadcast_to_frontends({
-        "event": "pattern_wrong",
+        "event": "game_over",
         "data": {
             "message": "❌ Fout! Game Over",
             "expected": state.pattern,
             "selected_tiles": list(state.selected_tiles),
-            "score": state.current_score,
-            "round": state.round_number
-        }
-    })
-    
-    # Wait then send game ended
-    await asyncio.sleep(2)
-    
-    await broadcast_to_frontends({
-        "event": "game_ended",
-        "data": {
-            "score": state.current_score,
-            "high_score": state.high_score,
-            "games_played": state.games_played,
-            "rounds": state.round_number
+            "final_score": state.current_score,
+            "rounds": state.round_number,
+            "team_name": state.current_team,
+            "level": state.current_level,
+            "penalty_applied": WRONG_PENALTY
         }
     })
     
     # Reset state
+    await asyncio.sleep(2)
     state.game_phase = "idle"
     state.player_steps = []
     state.pattern = []
