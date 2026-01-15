@@ -129,9 +129,9 @@ class GameState:
 # Scoring: correct = round_number * level_multiplier * 10
 # Wrong = -15 penalty (but score cannot go below 0)
 LEVEL_CONFIG = {
-    "easy": {"pattern_length": 1, "level_multiplier": 1, "base_points": 20, "time_limit": 30},
-    "medium": {"pattern_length": 3, "level_multiplier": 2, "base_points": 30, "time_limit": 25},
-    "hard": {"pattern_length": 5, "level_multiplier": 3, "base_points": 50, "time_limit": 20}
+    "easy": {"pattern_length": 1, "level_multiplier": 1, "base_points": 20},
+    "medium": {"pattern_length": 3, "level_multiplier": 2, "base_points": 30},
+    "hard": {"pattern_length": 5, "level_multiplier": 3, "base_points": 50}
 }
 
 WRONG_PENALTY = 15  # Points deducted for wrong answer
@@ -570,55 +570,6 @@ async def handle_frontend_message(msg: dict, websocket: WebSocket):
                 "message": "Press START on the master to begin!"
             }
         })
-    
-    elif event == "timeout":
-        # Player ran out of time
-        print(f"→ Timeout received from frontend")
-        if state.game_phase == "selecting":
-            await end_game_timeout()
-
-async def end_game_timeout():
-    """End the game when player runs out of time"""
-    print("→ Time's up - ending game...")
-    state.game_phase = "game_over"
-    
-    # Apply penalty (score can't go below 0)
-    state.current_score = max(0, state.current_score - WRONG_PENALTY)
-    
-    # Turn off all tiles
-    if state.master_ws:
-        await state.master_ws.send_json({
-            "event": "end_game",
-            "data": {}
-        })
-    
-    # Update stats
-    state.games_played += 1
-    
-    # Submit score to database from backend (only once)
-    await submit_score_to_db()
-    
-    # Send game over event
-    await broadcast_to_frontends({
-        "event": "game_over",
-        "data": {
-            "message": "⏰ Tijd is op! Game Over",
-            "expected": state.pattern,
-            "selected_tiles": list(state.selected_tiles),
-            "final_score": state.current_score,
-            "rounds": state.round_number,
-            "team_name": state.current_team,
-            "level": state.current_level,
-            "timeout": True
-        }
-    })
-    
-    # Reset state
-    await asyncio.sleep(2)
-    state.game_phase = "idle"
-    state.player_steps = []
-    state.pattern = []
-    state.selected_tiles = set()
 
 # ==================== GAME LOGIC ====================
 async def handle_start_button():
@@ -704,7 +655,6 @@ async def start_show_pattern(connected_tiles: List[int]):
         "event": "selecting_phase",
         "data": {
             "pattern_length": len(state.pattern),
-            "time_limit": level_config.get("time_limit", 30),
             "message": "Selecteer de juiste tegels!"
         }
     })

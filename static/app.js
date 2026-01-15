@@ -19,8 +19,6 @@ const gameState = {
   isPlaying: false,
   isSelectingPhase: false, // True during tile selection phase
   scoreSubmitted: false, // Prevent duplicate score submissions
-  timeLeft: 0,
-  timerInterval: null,
   leaderboardFilter: 'all', // Current leaderboard level filter
 };
 
@@ -67,21 +65,18 @@ const LEVEL_CONFIG = {
     steps: 1,
     levelMultiplier: 1,
     basePoints: 20,
-    timeLimit: 30,
     label: 'Easy Mode',
   },
   medium: {
     steps: 3,
     levelMultiplier: 2,
     basePoints: 30,
-    timeLimit: 25,
     label: 'Medium Mode',
   },
   hard: {
     steps: 5,
     levelMultiplier: 3,
     basePoints: 50,
-    timeLimit: 20,
     label: 'Hard Mode',
   },
 };
@@ -394,7 +389,6 @@ function handleWebSocketMessage(message) {
       break;
     case 'pattern_correct':
       // Pattern was correct - update score and prepare for next round
-      stopTimer(); // Stop the selection timer
       gameState.score = msgData.score || message.score || gameState.score;
       gameState.round = msgData.round || message.round || gameState.round;
       gameState.isSelectingPhase = false;
@@ -455,10 +449,6 @@ function handleWebSocketMessage(message) {
       startSelectingPhase(
         msgData.pattern_length || LEVEL_CONFIG[gameState.level].steps
       );
-      // Start timer for selecting phase
-      const timeLimit =
-        msgData.time_limit || LEVEL_CONFIG[gameState.level].timeLimit || 30;
-      startTimer(timeLimit);
       break;
     case 'tile_toggled':
       // A tile was toggled on/off
@@ -804,11 +794,6 @@ async function startGame() {
   elements.currentMode.textContent = MODE_CONFIG[gameState.mode].name;
   updateGameStats();
 
-  // Timer will be shown during selecting phase (startTimer handles display)
-  if (elements.timerDisplay) {
-    elements.timerDisplay.style.display = 'none'; // Hidden until selecting phase
-  }
-
   // Hide pattern sections initially
   elements.sequenceSection.classList.remove('visible');
   elements.stepsSection.classList.remove('visible');
@@ -867,21 +852,10 @@ function resetGame() {
   gameState.selectedTiles = new Set();
   gameState.isSelectingPhase = false;
 
-  // Clear timer if running
-  if (gameState.timerInterval) {
-    clearInterval(gameState.timerInterval);
-    gameState.timerInterval = null;
-  }
-
   elements.sequenceSection.classList.remove('visible');
   elements.stepsSection.classList.remove('visible');
   elements.sequenceGrid.innerHTML = '';
   elements.stepsGrid.innerHTML = '';
-
-  // Hide timer
-  if (elements.timerDisplay) {
-    elements.timerDisplay.style.display = 'none';
-  }
 
   // Clear tile states
   document.querySelectorAll('.tile').forEach((tile) => {
@@ -1085,9 +1059,7 @@ function startPlayerTurn(expectedCount) {
 
   // Set message based on mode
   if (gameState.mode === 'speedrun') {
-    const timeLimit = expectedCount * modeConfig.timePerStep;
-    setMessage('⚡', `Quick! You have ${timeLimit} seconds!`);
-    startTimer(timeLimit);
+    setMessage('⚡', 'Quick! Complete the pattern!');
   } else if (gameState.mode === 'endless') {
     setMessage('♾️', `Round ${gameState.round + 1}: ${expectedCount} steps!`);
   } else if (gameState.mode === 'simon') {
@@ -1107,69 +1079,6 @@ function startPlayerTurn(expectedCount) {
     box.textContent = i + 1;
     elements.stepsGrid.appendChild(box);
   }
-}
-
-// ============================================
-// TIMER FUNCTIONS (Speed Run Mode)
-// ============================================
-
-function startTimer(seconds) {
-  gameState.timeLeft = seconds;
-  updateTimerDisplay();
-
-  if (elements.timerDisplay) {
-    elements.timerDisplay.style.display = 'flex';
-    elements.timerDisplay.classList.remove('warning');
-  }
-
-  // Clear any existing timer
-  if (gameState.timerInterval) {
-    clearInterval(gameState.timerInterval);
-  }
-
-  gameState.timerInterval = setInterval(() => {
-    gameState.timeLeft--;
-    updateTimerDisplay();
-
-    // Warning when time is low
-    if (gameState.timeLeft <= 5 && elements.timerDisplay) {
-      elements.timerDisplay.classList.add('warning');
-    }
-
-    if (gameState.timeLeft <= 0) {
-      clearInterval(gameState.timerInterval);
-      gameState.timerInterval = null;
-      handleTimeOut();
-    }
-  }, 1000);
-}
-
-function stopTimer() {
-  if (gameState.timerInterval) {
-    clearInterval(gameState.timerInterval);
-    gameState.timerInterval = null;
-  }
-  if (elements.timerDisplay) {
-    elements.timerDisplay.classList.remove('warning');
-  }
-}
-
-function updateTimerDisplay() {
-  if (elements.timerValue) {
-    elements.timerValue.textContent = gameState.timeLeft;
-  }
-}
-
-function handleTimeOut() {
-  setMessage('⏰', "Time's up! Game Over!");
-
-  // Send timeout to backend
-  sendMessage({
-    type: 'timeout',
-    team_name: gameState.teamName,
-    score: gameState.score,
-    round: gameState.round,
-  });
 }
 
 function handleStepReceived(tileId, stepNumber, isCorrect) {
@@ -1215,9 +1124,6 @@ function handleRoundComplete(round, score) {
   gameState.score = score;
   updateGameStats();
 
-  // Stop timer for speed run mode
-  stopTimer();
-
   // Mode-specific completion message
   let message = `Round ${round} Complete! +${
     LEVEL_CONFIG[gameState.level].pointsPerRound
@@ -1256,9 +1162,6 @@ function handleGameOver(finalScore, rounds) {
   gameState.isPlaying = false;
   gameState.score = finalScore;
   gameState.round = rounds;
-
-  // Stop timer if running
-  stopTimer();
 
   // Update game over screen
   elements.finalScore.textContent = finalScore;
