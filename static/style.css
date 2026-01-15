@@ -1278,7 +1278,7 @@ body {
     animation: wrongShake 0.5s ease;
 }
 
-/* Selected tile (toggle mode) */
+/* Selected tile (toggle mode) - GREEN = ON (matches physical tile LED) */
 .tile.selected {
     background: linear-gradient(135deg, rgba(0, 255, 136, 0.4), rgba(0, 245, 255, 0.4));
     border-color: var(--neon-green);
@@ -1295,6 +1295,23 @@ body {
 
     50% {
         box-shadow: 0 0 50px rgba(0, 255, 136, 0.7), inset 0 0 25px rgba(0, 255, 136, 0.2);
+    }
+}
+
+/* Deselected tile (toggle OFF) - brief flash when tile turns off */
+.tile.off {
+    animation: tileOff 0.3s ease;
+}
+
+@keyframes tileOff {
+    0% {
+        box-shadow: 0 0 30px rgba(0, 255, 136, 0.4);
+        transform: scale(1.05);
+    }
+
+    100% {
+        box-shadow: none;
+        transform: scale(1);
     }
 }
 

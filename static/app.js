@@ -1011,23 +1011,38 @@ function startSelectingPhase(expectedCount) {
   `;
 }
 
-function handleTileToggled(tileId, isSelected, selectedTiles, expectedCount) {
-  console.log('🔄 Tile toggled:', tileId, 'selected:', isSelected);
+// ============================================
+// TILE TOGGLE HANDLING - Tile Authority Model
+// ============================================
+// The physical tile is the source of truth:
+// 1. Tile toggles its LED instantly when stepped on (no delay)
+// 2. Tile remembers its state (ON/OFF)
+// 3. Tile sends its state to website - we just mirror it
+// ============================================
 
-  // Update local state
+function handleTileToggled(tileId, isSelected, selectedTiles, expectedCount) {
+  console.log('🔄 Tile', tileId, 'reports:', isSelected ? 'ON (green)' : 'OFF');
+
+  // Mirror the tile's state - tile is authoritative
   if (isSelected) {
     gameState.selectedTiles.add(tileId);
   } else {
     gameState.selectedTiles.delete(tileId);
   }
 
-  // Update tile visual
+  // Update tile visual to match physical tile
   const tile = document.getElementById(`tile-${tileId}`);
   if (tile) {
     if (isSelected) {
+      // Tile LED is ON (green) - show as selected
       tile.classList.add('selected', 'active');
+      tile.classList.remove('off');
     } else {
+      // Tile LED is OFF - show as deselected
       tile.classList.remove('selected', 'active');
+      tile.classList.add('off');
+      // Remove 'off' class after brief moment
+      setTimeout(() => tile.classList.remove('off'), 200);
     }
   }
 
