@@ -18,8 +18,10 @@ const gameState = {
   masterConnected: false,
   isPlaying: false,
   isSelectingPhase: false, // True during tile selection phase
+  scoreSubmitted: false, // Prevent duplicate score submissions
   timeLeft: 0,
   timerInterval: null,
+  leaderboardFilter: 'all', // Current leaderboard level filter
 };
 
 // Game Mode Configuration
@@ -173,6 +175,18 @@ function setupEventListeners() {
   // Enter key for team name
   elements.teamNameInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') startGame();
+  });
+
+  // Leaderboard filter buttons
+  document.querySelectorAll('.filter-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document
+        .querySelectorAll('.filter-btn')
+        .forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      gameState.leaderboardFilter = btn.dataset.level;
+      loadFullLeaderboard();
+    });
   });
 }
 
@@ -702,16 +716,51 @@ function handleTileActivated(tileId) {
 // GAME LOGIC
 // ============================================
 
-function startGame() {
+async function startGame() {
   const teamName = elements.teamNameInput.value.trim();
+  const errorElement = document.getElementById('teamNameError');
+
+  // Hide previous error
+  if (errorElement) {
+    errorElement.style.display = 'none';
+  }
 
   if (!teamName) {
     elements.teamNameInput.focus();
     elements.teamNameInput.style.borderColor = 'var(--neon-red)';
+    if (errorElement) {
+      errorElement.textContent = 'Please enter a team name';
+      errorElement.style.display = 'block';
+    }
     setTimeout(() => {
       elements.teamNameInput.style.borderColor = '';
-    }, 1000);
+    }, 2000);
     return;
+  }
+
+  // Check if team name already exists
+  try {
+    const response = await fetch(
+      `/api/leaderboard/check-name?name=${encodeURIComponent(teamName)}`
+    );
+    const data = await response.json();
+
+    if (data.exists) {
+      elements.teamNameInput.focus();
+      elements.teamNameInput.style.borderColor = 'var(--neon-red)';
+      if (errorElement) {
+        errorElement.textContent =
+          'This team name is already taken! Choose a different name.';
+        errorElement.style.display = 'block';
+      }
+      setTimeout(() => {
+        elements.teamNameInput.style.borderColor = '';
+      }, 3000);
+      return;
+    }
+  } catch (error) {
+    console.error('Error checking team name:', error);
+    // Continue anyway if check fails
   }
 
   gameState.teamName = teamName;
@@ -719,6 +768,7 @@ function startGame() {
   gameState.round = 0;
   gameState.pattern = [];
   gameState.playerSteps = [];
+  gameState.scoreSubmitted = false;
 
   // Update UI
   elements.currentTeamName.textContent = teamName;
@@ -1210,8 +1260,15 @@ function handleGameOver(finalScore, rounds) {
       '<span class="title-icon">🎮</span> GAME OVER';
   }
 
-  // Submit score
-  submitScore(gameState.teamName, finalScore, gameState.level, rounds);
+  // Submit score only once and only if team name is valid
+  if (
+    !gameState.scoreSubmitted &&
+    gameState.teamName &&
+    gameState.teamName.trim()
+  ) {
+    gameState.scoreSubmitted = true;
+    submitScore(gameState.teamName.trim(), finalScore, gameState.level, rounds);
+  }
 
   showScreen('gameOver');
 }
@@ -1245,7 +1302,9 @@ async function loadFullLeaderboard() {
   try {
     elements.leaderboardFull.innerHTML =
       '<div class="loading-spinner"><div class="spinner"></div><span>Loading...</span></div>';
-    const response = await fetch('/api/leaderboard?limit=50');
+    const filter = gameState.leaderboardFilter || 'all';
+    const filterParam = filter !== 'all' ? `&level=${filter}` : '';
+    const response = await fetch(`/api/leaderboard?limit=50${filterParam}`);
     const data = await response.json();
     // Handle both array and object response formats
     const entries = Array.isArray(data)

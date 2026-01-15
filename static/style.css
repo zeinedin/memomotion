@@ -412,6 +412,31 @@ body {
     color: var(--text-muted);
 }
 
+.input-error {
+    display: block;
+    color: var(--neon-red);
+    font-size: 0.9rem;
+    margin-top: var(--space-sm);
+    padding-left: var(--space-sm);
+    animation: shake 0.3s ease-in-out;
+}
+
+@keyframes shake {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    25% {
+        transform: translateX(-5px);
+    }
+
+    75% {
+        transform: translateX(5px);
+    }
+}
+
 /* ============================================
    LEVEL SELECTOR
    ============================================ */
@@ -785,6 +810,7 @@ body {
 .leaderboard-list {
     max-height: 250px;
     overflow-y: auto;
+    overflow-x: hidden;
     margin-bottom: var(--space-md);
 }
 

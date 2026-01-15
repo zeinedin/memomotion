@@ -227,6 +227,29 @@ async def get_leaderboard(limit: int = 10, level: Optional[str] = None):
         print(f"✗ Error fetching leaderboard: {e}")
         return {"leaderboard": [], "error": str(e)}
 
+@app.get("/api/leaderboard/check-name")
+async def check_team_name(name: str):
+    """Check if a team name already exists in the leaderboard"""
+    if not cosmos_initialized:
+        return {"exists": False, "error": "Database not connected"}
+    
+    try:
+        query = "SELECT VALUE COUNT(1) FROM c WHERE LOWER(c.team_name) = LOWER(@name)"
+        parameters = [{"name": "@name", "value": name.strip()}]
+        
+        result = list(container.query_items(
+            query=query,
+            parameters=parameters,
+            enable_cross_partition_query=True
+        ))
+        
+        count = result[0] if result else 0
+        return {"exists": count > 0}
+        
+    except Exception as e:
+        print(f"✗ Error checking team name: {e}")
+        return {"exists": False, "error": str(e)}
+
 @app.post("/api/leaderboard")
 async def add_score(entry: ScoreEntry):
     """Add a new score to Cosmos DB leaderboard"""
