@@ -17,7 +17,7 @@ const char* WIFI_PASSWORD = "eveneven";  // <--- CHECK THIS
 const char* WS_HOST = "memo-motion.azurewebsites.net";    // <--- CHECK THIS (Your PC IP)
 const uint16_t WS_PORT = 443;
 
-#define START_BUTTON_PIN 0  // BOOT button
+#define START_BUTTON_PIN 13 // BOOT button
 #define STATUS_LED_PIN 2    // Blue LED
 #define MAX_TILES 16        // Updated for Memory XXL
 
