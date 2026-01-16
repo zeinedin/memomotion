@@ -545,6 +545,16 @@ function handleWebSocketMessage(message) {
         msgData.message || 'Game registered! Press START to begin!'
       );
       break;
+    case 'master_status':
+      // Master connection status update
+      console.log('🔌 Master status:', msgData.connected);
+      updateMasterStatus(msgData.connected);
+      break;
+    case 'error':
+      // Error message from backend
+      console.log('❌ Error:', msgData.message);
+      setMessage('❌', msgData.message || 'An error occurred');
+      break;
     default:
       // Reduce console spam - only log truly unknown types
       if (!['tile_status'].includes(msgType)) {

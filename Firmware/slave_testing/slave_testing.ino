@@ -31,13 +31,14 @@ bool isRegistered = false;
 bool tileLitState = false;
 bool isFootDown = false;  // Tracks if you are currently standing on it
 unsigned long lastRegisterTime = 0;
+unsigned long lastHeartbeat = 0;  // Periodic heartbeat to stay connected
 
-// Data Structures
+// Data Structures (MUST MATCH MASTER)
 typedef struct {
   uint8_t tileId;
-  uint8_t msgType;
-  uint8_t val;
-  uint8_t batt;
+  uint8_t messageType; // 0=Reg, 1=Step, 2=Heartbeat, 3=Battery
+  uint8_t value;
+  uint8_t batteryLevel;
 } TileMessage;
 typedef struct {
   uint8_t tileId;
@@ -56,11 +57,12 @@ void setLights(bool isOn) {
 }
 
 // ==================== COMMS HELPER ====================
-void sendMessage(uint8_t type, uint8_t value) {
+void sendMessage(uint8_t type, uint8_t val) {
   TileMessage msg;
   msg.tileId = TILE_ID;
-  msg.msgType = type;
-  msg.val = value;
+  msg.messageType = type;  // 0=Reg, 1=Step, 2=Heartbeat
+  msg.value = val;
+  msg.batteryLevel = 100;  // TODO: Read actual battery
   esp_now_send(masterMAC, (uint8_t *)&msg, sizeof(msg));
 }
 
@@ -144,10 +146,17 @@ void loop() {
       // Mark foot as down - this prevents re-triggering
       isFootDown = true;
 
-      // ACTION: Toggle
+      // ACTION: Toggle LED state
       tileLitState = !tileLitState;
+      Serial.printf("LED State: %s\n", tileLitState ? "ON" : "OFF");
       setLights(tileLitState);
+      
+      // Small delay to ensure LED change is visible before sending message
+      delay(50);
+      
+      // Send to master
       sendMessage(1, tileLitState ? 1 : 0);
+      Serial.printf("Sent to master: is_on=%d\n", tileLitState ? 1 : 0);
     }
   }
 
@@ -160,11 +169,17 @@ void loop() {
     }
   }
 
-  // Register Retry
+  // Register Retry (if not registered yet)
   if (!isRegistered && (millis() - lastRegisterTime > 3000)) {
     Serial.println("Connecting...");
-    sendMessage(0, 0);
+    sendMessage(0, 0);  // msgType 0 = register
     lastRegisterTime = millis();
+  }
+  
+  // Heartbeat to stay connected (every 2 seconds)
+  if (isRegistered && (millis() - lastHeartbeat > 2000)) {
+    sendMessage(2, 0);  // msgType 2 = heartbeat
+    lastHeartbeat = millis();
   }
 
   delay(10);

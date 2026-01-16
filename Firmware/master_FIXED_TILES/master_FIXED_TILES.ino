@@ -97,9 +97,12 @@ void loop() {
   
   unsigned long currentMillis = millis();
 
-  // 1. Handle Button Press (Start Game)
-  if (digitalRead(START_BUTTON_PIN) == LOW) {
-    if (currentMillis - lastButtonPress > 500) { // 500ms Debounce
+  // 1. Handle Button Press (Start Game) with proper debounce
+  bool currentButtonState = digitalRead(START_BUTTON_PIN);
+  
+  // Only trigger on button PRESS (HIGH -> LOW transition)
+  if (currentButtonState == LOW && lastButtonState == HIGH) {
+    if (currentMillis - lastButtonPress > 300) { // 300ms debounce
       Serial.println("👉 START BUTTON PRESSED");
       if (wsConnected) {
         webSocket.sendTXT("{\"event\":\"start_button_pressed\",\"data\":{}}");
@@ -109,6 +112,7 @@ void loop() {
       lastButtonPress = currentMillis;
     }
   }
+  lastButtonState = currentButtonState;
 
   // 2. Handle Pending Steps (From Tiles)
   if (pendingStepTileId > 0) {
@@ -123,6 +127,16 @@ void loop() {
 
   // 3. Periodic Updates to Backend (Every 2 seconds)
   if (wsConnected && currentMillis - lastHeartbeat > 2000) {
+    // Check for tile timeouts (5 seconds without message = disconnected)
+    bool statusChanged = false;
+    for (int i = 0; i < tileCount; i++) {
+      if (registeredTiles[i].isConnected && (currentMillis - registeredTiles[i].lastSeen > 5000)) {
+        Serial.printf("⚠️ Tile %d timeout - marking disconnected\n", registeredTiles[i].id);
+        registeredTiles[i].isConnected = false;
+        statusChanged = true;
+      }
+    }
+    
     sendTileStatus(); // Keep backend sync'd
     lastHeartbeat = currentMillis;
   }
@@ -166,15 +180,18 @@ void onTileMessage(const esp_now_recv_info_t *info, const uint8_t *data, int len
   registeredTiles[knownIndex].isConnected = true;
 
   // 4. Handle Message Types
-  if (msg.messageType == 1 && msg.value == 1) {
-    // STEP DETECTED
-    Serial.printf("👣 Step detected on Tile %d\n", msg.tileId);
-    pendingStepTileId = msg.tileId;
+  if (msg.messageType == 1) {
+    // STEP/TOGGLE - Forward to backend with is_on state
+    bool isOn = (msg.value == 1);
+    Serial.printf("👣 Tile %d toggled: %s\n", msg.tileId, isOn ? "ON" : "OFF");
     
-    // Immediate Visual Feedback (Optional)
-    sendCommandToTile(msg.tileId, 1); // Light ON
-    delay(50);
-    sendCommandToTile(msg.tileId, 0); // Light OFF
+    // Send immediately to backend
+    if (wsConnected) {
+      char stepMsg[100];
+      sprintf(stepMsg, "{\"event\":\"player_step\",\"data\":{\"tile_id\":%d,\"is_on\":%s}}", 
+              msg.tileId, isOn ? "true" : "false");
+      webSocket.sendTXT(stepMsg);
+    }
   }
   else if (msg.messageType == 0) {
     // Explicit Registration Request

@@ -448,19 +448,25 @@ async def handle_master_message(msg: dict):
     print(f"← Master: {event}")
     
     if event == "tile_status":
-        # Update tile status
+        # Update tile status - REPLACE entire tiles dict with what master reports
         tiles_data = data.get("tiles", [])
-        print(f"  Received {len(tiles_data)} tiles")
+        print(f"  Received {len(tiles_data)} tiles from master")
         
+        # Clear old tile data and rebuild from master's report
+        new_tiles = {}
         for tile in tiles_data:
             tile_id = tile["id"]
-            state.tiles[tile_id] = {
+            new_tiles[tile_id] = {
                 "connected": tile["connected"],
                 "battery": tile.get("battery", 100)
             }
-            print(f"    Tile {tile_id}: {tile['connected']}")
+            print(f"    Tile {tile_id}: {'connected' if tile['connected'] else 'disconnected'}")
         
-        print(f"  Total tiles in state: {len(state.tiles)}")
+        # Replace state with new data
+        state.tiles = new_tiles
+        
+        connected_count = sum(1 for t in state.tiles.values() if t["connected"])
+        print(f"  Total tiles: {len(state.tiles)}, Connected: {connected_count}")
         
         # Broadcast to frontends
         await broadcast_to_frontends({
@@ -468,7 +474,7 @@ async def handle_master_message(msg: dict):
             "data": {
                 "tiles": state.tiles,
                 "total": len(state.tiles),
-                "connected": sum(1 for t in state.tiles.values() if t["connected"])
+                "connected": connected_count
             }
         })
     
