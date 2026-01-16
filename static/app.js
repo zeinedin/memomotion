@@ -548,7 +548,8 @@ function handleWebSocketMessage(message) {
     case 'master_status':
       // Master connection status update
       console.log('🔌 Master status:', msgData.connected);
-      updateMasterStatus(msgData.connected);
+      gameState.masterConnected = msgData.connected;
+      updateMasterStatus();
       break;
     case 'error':
       // Error message from backend

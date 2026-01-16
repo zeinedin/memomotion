@@ -10,7 +10,7 @@
 #include <Adafruit_NeoPixel.h>
 
 // ==================== CONFIGURATION ====================
-#define TILE_ID 2
+#define TILE_ID 3
 #define LED_PIN 13
 #define LED_COUNT 12
 #define TOUCH_PIN 4
