@@ -135,8 +135,6 @@ function cacheElements() {
   elements.messageIcon = document.getElementById('messageIcon');
   elements.messageText = document.getElementById('messageText');
   elements.tileGrid = document.getElementById('tileGrid');
-  elements.sequenceSection = document.getElementById('sequenceSection');
-  elements.sequenceGrid = document.getElementById('sequenceGrid');
   elements.stepsSection = document.getElementById('stepsSection');
   elements.stepsGrid = document.getElementById('stepsGrid');
 
@@ -405,7 +403,6 @@ function handleWebSocketMessage(message) {
             'active'
           );
         });
-        elements.sequenceSection.classList.remove('visible');
         elements.stepsSection.classList.remove('visible');
         setMessage('🎮', 'Next round starting...');
       }, 2000);
@@ -809,8 +806,7 @@ async function startGame() {
   elements.currentMode.textContent = MODE_CONFIG[gameState.mode].name;
   updateGameStats();
 
-  // Hide pattern sections initially
-  elements.sequenceSection.classList.remove('visible');
+  // Hide steps section initially
   elements.stepsSection.classList.remove('visible');
 
   // Set initial message based on mode
@@ -867,9 +863,7 @@ function resetGame() {
   gameState.selectedTiles = new Set();
   gameState.isSelectingPhase = false;
 
-  elements.sequenceSection.classList.remove('visible');
   elements.stepsSection.classList.remove('visible');
-  elements.sequenceGrid.innerHTML = '';
   elements.stepsGrid.innerHTML = '';
 
   // Clear tile states
@@ -907,33 +901,25 @@ function setMessage(icon, text) {
 }
 
 // ============================================
-// PATTERN DISPLAY
+// PATTERN DISPLAY (internal - no UI display)
 // ============================================
 
 function showPattern(pattern) {
   gameState.pattern = pattern;
-  setMessage('🧠', 'Watch the pattern carefully!');
+  setMessage('🧠', 'Watch the tiles light up!');
 
-  // Show sequence section
-  elements.sequenceSection.classList.add('visible');
+  // Pattern is shown only on physical tiles, not on website
   elements.stepsSection.classList.remove('visible');
-  elements.sequenceGrid.innerHTML = '';
 
   // Clear previous tile highlights
   document.querySelectorAll('.tile').forEach((tile) => {
     tile.classList.remove('pattern', 'step', 'correct', 'wrong');
   });
 
-  // Animate pattern display
+  // Animate pattern display on website tiles (mirror physical tiles)
   let delay = 0;
   pattern.forEach((tileId, index) => {
     setTimeout(() => {
-      // Add to sequence grid
-      const box = document.createElement('div');
-      box.className = 'sequence-box';
-      box.textContent = index + 1;
-      elements.sequenceGrid.appendChild(box);
-
       // Highlight tile on grid
       const tile = document.getElementById(`tile-${tileId}`);
       if (tile) {
@@ -956,10 +942,8 @@ function showPatternSimultaneous(pattern) {
   gameState.selectedTiles = new Set();
   gameState.isSelectingPhase = false;
 
-  // Show sequence section with all tiles at once
-  elements.sequenceSection.classList.add('visible');
+  // Pattern shown only on physical tiles and mirrored on website tiles
   elements.stepsSection.classList.remove('visible');
-  elements.sequenceGrid.innerHTML = '';
 
   // Clear previous tile highlights
   document.querySelectorAll('.tile').forEach((tile) => {
@@ -973,15 +957,8 @@ function showPatternSimultaneous(pattern) {
     );
   });
 
-  // Show all pattern tiles simultaneously
-  pattern.forEach((tileId, index) => {
-    // Add to sequence grid (shows which tiles are part of pattern)
-    const box = document.createElement('div');
-    box.className = 'sequence-box pattern-active';
-    box.textContent = tileId;
-    elements.sequenceGrid.appendChild(box);
-
-    // Highlight tile on grid - stays on for 8 seconds
+  // Highlight pattern tiles on website grid (mirrors physical tiles)
+  pattern.forEach((tileId) => {
     const tile = document.getElementById(`tile-${tileId}`);
     if (tile) {
       tile.classList.add('pattern');
@@ -1000,8 +977,7 @@ function startSelectingPhase(expectedCount) {
   gameState.selectedTiles = new Set();
   gameState.isSelectingPhase = true;
 
-  // Hide pattern display, show selection counter
-  elements.sequenceSection.classList.add('visible');
+  // Show steps section with selection info
   elements.stepsSection.classList.add('visible');
 
   // Clear pattern highlights - pattern is now hidden
@@ -1009,15 +985,11 @@ function startSelectingPhase(expectedCount) {
     tile.classList.remove('pattern');
   });
 
-  // Update sequence grid to show selection counter
-  elements.sequenceGrid.innerHTML = `
+  // Update steps grid with selection counter and instruction
+  elements.stepsGrid.innerHTML = `
     <div class="selection-counter">
       <span id="selected-count">0</span> / <span id="expected-count">${expectedCount}</span>
     </div>
-  `;
-
-  // Update steps grid with instruction
-  elements.stepsGrid.innerHTML = `
     <div class="selection-instruction">
       <p>Selecteer ${expectedCount} tegels</p>
       <p class="hint">Stap op een tegel om te selecteren/deselecteren</p>
@@ -1179,7 +1151,6 @@ function handleRoundComplete(round, score) {
     document.querySelectorAll('.tile').forEach((tile) => {
       tile.classList.remove('step', 'pattern', 'correct');
     });
-    elements.sequenceSection.classList.remove('visible');
     elements.stepsSection.classList.remove('visible');
   }, 1500);
 }
