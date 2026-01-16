@@ -418,14 +418,27 @@ async def master_websocket(websocket: WebSocket):
         print("✗ Master disconnected")
         state.master_ws = None
         state.master_id = None
+        # Clear all tiles - they're no longer reachable
+        state.tiles.clear()
         await broadcast_to_frontends({
             "event": "master_status",
             "data": {"connected": False}
+        })
+        # Notify frontend that all tiles are now offline
+        await broadcast_to_frontends({
+            "event": "tile_status",
+            "data": {
+                "tiles": {},
+                "total": 0,
+                "connected": 0
+            }
         })
     except Exception as e:
         print(f"Master error: {e}")
         state.master_ws = None
         state.master_id = None
+        # Clear all tiles on error too
+        state.tiles.clear()
 
 async def handle_master_message(msg: dict):
     """Handle messages from master ESP32"""
@@ -506,13 +519,16 @@ async def frontend_websocket(websocket: WebSocket):
     state.frontend_connections.append(websocket)
     print(f"→ Frontend connected (Total: {len(state.frontend_connections)})")
     
-    # Send initial state
+    # Send initial state with current tile status
+    connected_tiles = [tid for tid, info in state.tiles.items() if info.get("connected", False)]
     await websocket.send_json({
         "event": "initial_state",
         "data": {
             "master_connected": state.master_id is not None,
             "games_played": state.games_played,
-            "high_score": state.high_score
+            "high_score": state.high_score,
+            "tiles": state.tiles,
+            "connected_tiles": connected_tiles
         }
     })
     

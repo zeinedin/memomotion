@@ -328,12 +328,18 @@ function handleWebSocketMessage(message) {
         gameState.masterConnected = msgData.master_connected;
         updateMasterStatus();
       }
-      if (msgData.tiles) {
+      // Handle tile status - prefer connected_tiles array, fallback to tiles object
+      if (msgData.connected_tiles) {
+        updateTileStatus(msgData.connected_tiles);
+      } else if (msgData.tiles) {
         const tileIds = Object.keys(msgData.tiles).map(Number);
         const connectedTiles = tileIds.filter(
           (id) => msgData.tiles[id]?.connected
         );
         updateTileStatus(connectedTiles);
+      } else {
+        // No tile data - assume no tiles connected
+        updateTileStatus([]);
       }
       break;
     case 'status':
