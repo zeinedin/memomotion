@@ -153,7 +153,7 @@ async def root():
     }
 @app.get('/')
 async def read_index():
-    return FileResponse('static/index_4esp.html')
+    return FileResponse('static/index.html')
 
 @app.get("/app.js")
 async def read_js():

@@ -208,7 +208,7 @@
                 <div class="registration-progress">
                     <div class="progress-bar">
                         <div class="progress-fill" id="progressFill" style="width: 0%;">
-                            0/16
+                            0/12
                         </div>
                     </div>
                     <button class="reset-registration-btn" id="resetRegistrationBtn">
@@ -246,11 +246,11 @@
                         </div>
                         <div class="status-badge" id="espStatus">
                             <span class="status-dot disconnected"></span>
-                            ESPs: 0/4
+                            Tile Hubs: 0/3
                         </div>
                         <div class="status-badge" id="tileStatus">
                             <span class="status-dot disconnected"></span>
-                            Tiles: 0/16
+                            Tiles: 0/12
                         </div>
                     </div>
                 </div>
@@ -298,7 +298,7 @@
         let registrationData = {
             tileEsps: [],
             tiles: [],
-            summary: { connected_esps: 0, registered_tiles: 0, total_esps: 4, total_tiles: 16 }
+            summary: { connected_esps: 0, registered_tiles: 0, total_esps: 3, total_tiles: 12 }
         };
 
         // Game state
@@ -419,18 +419,18 @@
             // Update ESP status
             const espStatus = document.getElementById('espStatus');
             const connectedEsps = espArray.filter(e => e.connected).length;
-            espStatus.innerHTML = `<span class="status-dot ${connectedEsps > 0 ? 'connected' : 'disconnected'}"></span>ESPs: ${connectedEsps}/4`;
+            espStatus.innerHTML = `<span class="status-dot ${connectedEsps > 0 ? 'connected' : 'disconnected'}"></span>Tile Hubs: ${connectedEsps}/3`;
 
             // Update tile status
             const registeredTiles = tilesArray.filter(t => t.connected || t.registered).length;
             const tileStatus = document.getElementById('tileStatus');
-            tileStatus.innerHTML = `<span class="status-dot ${registeredTiles > 0 ? 'connected' : 'disconnected'}"></span>Tiles: ${registeredTiles}/16`;
+            tileStatus.innerHTML = `<span class="status-dot ${registeredTiles > 0 ? 'connected' : 'disconnected'}"></span>Tiles: ${registeredTiles}/12`;
 
             // Update ESP grid
             const espGrid = document.getElementById('espGrid');
             espGrid.innerHTML = '';
 
-            for (let espId = 1; espId <= 4; espId++) {
+            for (let espId = 1; espId <= 3; espId++) {
                 const espData = espArray.find(e => e.id === espId || e.esp_id === espId);
                 const isConnected = espData && espData.connected;
 
@@ -440,7 +440,7 @@
                 const espHeader = document.createElement('div');
                 espHeader.className = 'esp-header';
                 espHeader.innerHTML = `
-                    <span class="esp-id">ESP #${espId}</span>
+                    <span class="esp-id">Tile Hub #${espId}</span>
                     <span class="esp-status ${isConnected ? 'connected' : 'disconnected'}">
                         ${isConnected ? '✓ Online' : '✗ Offline'}
                     </span>
@@ -470,10 +470,10 @@
             }
 
             // Update progress bar
-            const percentage = (registeredTiles / 16) * 100;
+            const percentage = (registeredTiles / 12) * 100;
             const progressFill = document.getElementById('progressFill');
             progressFill.style.width = `${percentage}%`;
-            progressFill.textContent = `${registeredTiles}/16`;
+            progressFill.textContent = `${registeredTiles}/12`;
 
             // Enable/disable start button
             const startBtn = document.getElementById('startGameBtn');
@@ -481,10 +481,10 @@
 
             if (connectedEsps === 0) {
                 startBtn.disabled = true;
-                startError.textContent = 'No ESPs connected';
+                startError.textContent = 'No Tile Hubs connected';
             } else if (registeredTiles < 2) {
                 startBtn.disabled = true;
-                startError.textContent = `Need at least 2 registered tiles (${registeredTiles}/16)`;
+                startError.textContent = `Need at least 2 registered tiles (${registeredTiles}/12)`;
             } else {
                 startBtn.disabled = false;
                 startError.textContent = '';

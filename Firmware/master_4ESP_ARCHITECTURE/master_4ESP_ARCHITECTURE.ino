@@ -19,8 +19,8 @@ const uint16_t WS_PORT = 443;
 
 #define START_BUTTON_PIN 13
 #define STATUS_LED_PIN 2
-#define MAX_TILES 16
-#define NUM_TILE_ESPS 4
+#define MAX_TILES 12
+#define NUM_TILE_ESPS 3
 
 // Broadcast address (Send to everyone)
 uint8_t broadcastAddress[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
@@ -60,8 +60,8 @@ bool wsConnected = false;
 unsigned long lastHeartbeat = 0;
 
 // ESP Hub tracking
-bool espConnected[NUM_TILE_ESPS] = {false, false, false, false};
-unsigned long espLastSeen[NUM_TILE_ESPS] = {0, 0, 0, 0};
+bool espConnected[NUM_TILE_ESPS] = {false, false, false};
+unsigned long espLastSeen[NUM_TILE_ESPS] = {0, 0, 0};
 const unsigned long ESP_TIMEOUT = 5000; // 5 seconds
 
 // Button state tracking
@@ -95,8 +95,8 @@ void setup() {
   // Initialize tile array
   for (int i = 0; i < MAX_TILES; i++) {
     tiles[i].globalId = i + 1;
-    tiles[i].espId = i / 4;
-    tiles[i].port = i % 4;
+    tiles[i].espId = i / 3;
+    tiles[i].port = i % 3;
     tiles[i].isRegistered = false;
     tiles[i].isConnected = false;
     tiles[i].lastSeen = 0;
