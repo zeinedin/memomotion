@@ -387,13 +387,38 @@
         function updateRegistrationDisplay(data) {
             registrationData = data;
 
+            // Convert tiles object to array if needed
+            let tilesArray = [];
+            if (data.tiles) {
+                if (Array.isArray(data.tiles)) {
+                    tilesArray = data.tiles;
+                } else {
+                    // Convert object {1: {connected: true}, 2: {...}} to array
+                    tilesArray = Object.keys(data.tiles).map(id => ({
+                        id: parseInt(id),
+                        connected: data.tiles[id].connected,
+                        registered: data.tiles[id].connected // Assume connected tiles are registered
+                    }));
+                }
+            }
+
+            // Convert tile_esps to array if needed
+            let espArray = [];
+            if (data.tile_esps) {
+                if (Array.isArray(data.tile_esps)) {
+                    espArray = data.tile_esps;
+                } else {
+                    espArray = Object.values(data.tile_esps);
+                }
+            }
+
             // Update ESP status
             const espStatus = document.getElementById('espStatus');
-            const connectedEsps = data.tile_esps ? data.tile_esps.filter(e => e.connected).length : 0;
+            const connectedEsps = espArray.filter(e => e.connected).length;
             espStatus.innerHTML = `<span class="status-dot ${connectedEsps > 0 ? 'connected' : 'disconnected'}"></span>ESPs: ${connectedEsps}/4`;
 
             // Update tile status
-            const registeredTiles = data.tiles ? data.tiles.filter(t => t.registered).length : 0;
+            const registeredTiles = tilesArray.filter(t => t.connected || t.registered).length;
             const tileStatus = document.getElementById('tileStatus');
             tileStatus.innerHTML = `<span class="status-dot ${registeredTiles > 0 ? 'connected' : 'disconnected'}"></span>Tiles: ${registeredTiles}/16`;
 
@@ -402,7 +427,7 @@
             espGrid.innerHTML = '';
 
             for (let espId = 1; espId <= 4; espId++) {
-                const espData = data.tile_esps ? data.tile_esps.find(e => e.id === espId) : null;
+                const espData = espArray.find(e => e.id === espId || e.esp_id === espId);
                 const isConnected = espData && espData.connected;
 
                 const espCard = document.createElement('div');
@@ -424,8 +449,8 @@
                 const startTile = (espId - 1) * 4 + 1;
                 for (let i = 0; i < 4; i++) {
                     const tileId = startTile + i;
-                    const tileData = data.tiles ? data.tiles.find(t => t.id === tileId) : null;
-                    const isRegistered = tileData && tileData.registered;
+                    const tileData = tilesArray.find(t => t.id === tileId);
+                    const isRegistered = tileData && (tileData.connected || tileData.registered);
 
                     const tileIndicator = document.createElement('div');
                     tileIndicator.className = `tile-indicator ${isRegistered ? 'registered' : 'not-registered'}`;
