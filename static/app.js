@@ -141,7 +141,7 @@ function cacheElements() {
   // Leaderboard screen
   elements.leaderboardFull = document.getElementById('leaderboardFull');
   elements.backFromLeaderboardBtn = document.getElementById(
-    'backFromLeaderboardBtn'
+    'backFromLeaderboardBtn',
   );
 
   // Game over screen
@@ -180,11 +180,11 @@ function setupEventListeners() {
   // Navigation buttons
   elements.startGameBtn.addEventListener('click', startGame);
   elements.viewLeaderboardBtn.addEventListener('click', () =>
-    showScreen('leaderboard')
+    showScreen('leaderboard'),
   );
   elements.backToStartBtn.addEventListener('click', confirmExit);
   elements.backFromLeaderboardBtn.addEventListener('click', () =>
-    showScreen('start')
+    showScreen('start'),
   );
   elements.playAgainBtn.addEventListener('click', playAgain);
   elements.backToMenuBtn.addEventListener('click', () => showScreen('start'));
@@ -291,7 +291,7 @@ function attemptReconnect() {
     console.log(
       `🔄 Reconnecting in ${
         delay / 1000
-      }s (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`
+      }s (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`,
     );
     setTimeout(connectWebSocket, delay);
   }
@@ -322,7 +322,7 @@ function handleWebSocketMessage(message) {
       // Initial connection or state update - update master status
       console.log(
         '✓ State received, master_connected:',
-        msgData.master_connected
+        msgData.master_connected,
       );
       if (msgData.master_connected !== undefined) {
         gameState.masterConnected = msgData.master_connected;
@@ -334,7 +334,7 @@ function handleWebSocketMessage(message) {
       } else if (msgData.tiles) {
         const tileIds = Object.keys(msgData.tiles).map(Number);
         const connectedTiles = tileIds.filter(
-          (id) => msgData.tiles[id]?.connected
+          (id) => msgData.tiles[id]?.connected,
         );
         updateTileStatus(connectedTiles);
       } else {
@@ -350,7 +350,7 @@ function handleWebSocketMessage(message) {
       if (msgData.tiles) {
         const tileIds = Object.keys(msgData.tiles).map(Number);
         const connectedTiles = tileIds.filter(
-          (id) => msgData.tiles[id]?.connected
+          (id) => msgData.tiles[id]?.connected,
         );
         updateTileStatus(connectedTiles);
       } else {
@@ -374,20 +374,20 @@ function handleWebSocketMessage(message) {
       startPlayerTurn(
         msgData.expected_count ||
           message.expected_count ||
-          LEVEL_CONFIG[gameState.level].steps
+          LEVEL_CONFIG[gameState.level].steps,
       );
       break;
     case 'step_received':
       handleStepReceived(
         msgData.tile_id || message.tile_id,
         msgData.step_number || message.step_number,
-        msgData.is_correct || message.is_correct
+        msgData.is_correct || message.is_correct,
       );
       break;
     case 'round_complete':
       handleRoundComplete(
         msgData.round || message.round,
-        msgData.score || message.score
+        msgData.score || message.score,
       );
       break;
     case 'pattern_correct':
@@ -406,7 +406,7 @@ function handleWebSocketMessage(message) {
             'pattern',
             'correct',
             'selected',
-            'active'
+            'active',
           );
         });
         elements.stepsSection.classList.remove('visible');
@@ -418,7 +418,7 @@ function handleWebSocketMessage(message) {
       setMessage('❌', msgData.message || 'Game Over!');
       handleGameOver(
         msgData.final_score ?? msgData.score ?? gameState.score,
-        msgData.rounds ?? msgData.round ?? gameState.round
+        msgData.rounds ?? msgData.round ?? gameState.round,
       );
       break;
     case 'waiting_for_start':
@@ -449,7 +449,7 @@ function handleWebSocketMessage(message) {
       gameState.selectedTiles = new Set();
       setMessage('👆', msgData.message || 'Selecteer de juiste tegels!');
       startSelectingPhase(
-        msgData.pattern_length || LEVEL_CONFIG[gameState.level].steps
+        msgData.pattern_length || LEVEL_CONFIG[gameState.level].steps,
       );
       break;
     case 'tile_toggled':
@@ -458,7 +458,7 @@ function handleWebSocketMessage(message) {
         msgData.tile_id,
         msgData.is_selected,
         msgData.selected_tiles || [],
-        msgData.expected_count || 0
+        msgData.expected_count || 0,
       );
       break;
     case 'master_connected':
@@ -481,7 +481,7 @@ function handleWebSocketMessage(message) {
     case 'pattern_wrong':
       // Legacy event - redirect to game_over handling
       console.log(
-        'pattern_wrong received, but game_over should handle this now'
+        'pattern_wrong received, but game_over should handle this now',
       );
       break;
     case 'game_ended':
@@ -491,7 +491,7 @@ function handleWebSocketMessage(message) {
     case 'player_input_phase':
       // Player's turn to repeat the pattern
       startPlayerTurn(
-        msgData.expected_count || LEVEL_CONFIG[gameState.level].steps
+        msgData.expected_count || LEVEL_CONFIG[gameState.level].steps,
       );
       break;
     case 'tile_pressed':
@@ -542,7 +542,7 @@ function handleWebSocketMessage(message) {
       // Game registration confirmed
       setMessage(
         '✅',
-        msgData.message || 'Game registered! Press START to begin!'
+        msgData.message || 'Game registered! Press START to begin!',
       );
       break;
     case 'master_status':
@@ -580,7 +580,7 @@ function handleStatusUpdate(data) {
   if (statusData.tiles) {
     const tileIds = Object.keys(statusData.tiles).map(Number);
     const connectedTiles = tileIds.filter(
-      (id) => statusData.tiles[id]?.connected
+      (id) => statusData.tiles[id]?.connected,
     );
     updateTileStatus(connectedTiles);
   }
@@ -644,7 +644,7 @@ function updateTileStatus(connectedTiles) {
   if (gameState.masterConnected && connected > 0) {
     setMessage(
       '🎮',
-      `${connected}/${TOTAL_TILES} tiles online! Press START on the master to begin!`
+      `${connected}/${TOTAL_TILES} tiles online! Press START on the master to begin!`,
     );
   }
 }
@@ -785,7 +785,7 @@ async function startGame() {
   try {
     console.log('Checking if team name exists:', teamName);
     const response = await fetch(
-      `/api/leaderboard/check-name?name=${encodeURIComponent(teamName)}`
+      `/api/leaderboard/check-name?name=${encodeURIComponent(teamName)}`,
     );
     const data = await response.json();
     console.log('Team name check result:', data);
@@ -891,7 +891,7 @@ function resetGame() {
       'step',
       'correct',
       'wrong',
-      'selected'
+      'selected',
     );
   });
 }
@@ -959,7 +959,7 @@ function showPatternSimultaneous(pattern) {
   gameState.selectedTiles = new Set();
   gameState.isSelectingPhase = false;
 
-  // Pattern shown only on physical tiles and mirrored on website tiles
+  // Display pattern on both physical tiles AND website
   elements.stepsSection.classList.remove('visible');
 
   // Clear previous tile highlights
@@ -970,19 +970,26 @@ function showPatternSimultaneous(pattern) {
       'correct',
       'wrong',
       'selected',
-      'active'
+      'active',
     );
   });
 
-  // Highlight pattern tiles on website grid (mirrors physical tiles)
+  // Highlight pattern tiles on website grid - keep visible for memorization
+  console.log('🎯 Displaying pattern on website:', pattern);
   pattern.forEach((tileId) => {
     const tile = document.getElementById(`tile-${tileId}`);
     if (tile) {
-      tile.classList.add('pattern');
+      tile.classList.add('pattern', 'active');
+      console.log(`✓ Tile ${tileId} highlighted on website`);
+    } else {
+      console.warn(`⚠️ Tile ${tileId} not found in DOM`);
     }
   });
 
-  // After 8 seconds, tiles will turn off (handled by backend sending selecting_phase)
+  // Update message to show memorization instruction
+  setMessage('🧠', `Memoreer deze ${pattern.length} tegels! (8 seconden)`);
+
+  // Pattern stays visible until selecting_phase event (handled by backend after 8 seconds)
 }
 
 // ============================================
@@ -1186,7 +1193,7 @@ function handleGameOver(finalScore, rounds) {
   elements.finalRounds.textContent = rounds;
   elements.finalLevel.textContent = LEVEL_CONFIG[gameState.level].label.replace(
     ' Mode',
-    ''
+    '',
   );
 
   // Set title based on score
@@ -1287,11 +1294,11 @@ function renderLeaderboard(container, entries, isPreview) {
                 <span class="rank ${rankClass}">${medal}</span>
                 <div class="team-info">
                     <span class="team-name">${escapeHtml(
-                      entry.team_name
+                      entry.team_name,
                     )}</span>
                     <span class="team-meta">${entry.level.toUpperCase()} • ${
-        entry.rounds
-      } rounds</span>
+                      entry.rounds
+                    } rounds</span>
                 </div>
                 <span class="team-score">${entry.score}</span>
             </div>
