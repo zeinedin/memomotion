@@ -424,13 +424,16 @@ async def master_websocket(websocket: WebSocket):
             "event": "master_status",
             "data": {"connected": False}
         })
-        # Notify frontend that all tiles are now offline
+        # Notify frontend that all tiles and ESPs are now offline
         await broadcast_to_frontends({
             "event": "tile_status",
             "data": {
                 "tiles": {},
+                "tile_esps": [],
                 "total": 0,
-                "connected": 0
+                "connected": 0,
+                "connected_esps": 0,
+                "master_connected": False
             }
         })
     except Exception as e:

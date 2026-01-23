@@ -406,9 +406,9 @@
                 }
             }
 
-            // Convert tile_esps to array if needed
+            // Convert tile_esps to array if needed (or empty if master disconnected)
             let espArray = [];
-            if (data.tile_esps) {
+            if (data.tile_esps && data.master_connected !== false) {
                 if (Array.isArray(data.tile_esps)) {
                     espArray = data.tile_esps;
                 } else {
