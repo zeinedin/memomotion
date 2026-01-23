@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Memory XXL - 4-ESP Architecture</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link
         href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@400;500;600;700&display=swap"
@@ -312,7 +312,11 @@
 
         // Connect to backend
         function connectWebSocket() {
-            const wsUrl = `ws://${window.location.hostname}:8000/ws/frontend`;
+            // Use wss:// for HTTPS (Azure), ws:// for HTTP (local)
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/frontend`;
+
+            console.log('🔌 Connecting to:', wsUrl);
             socket = new WebSocket(wsUrl);
 
             socket.onopen = () => {

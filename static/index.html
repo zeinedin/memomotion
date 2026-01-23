@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Memory XXL - The Game</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link
         href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@400;500;600;700&display=swap"
@@ -314,7 +314,13 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script>
+        // Ensure WebSocket connects properly on Azure (WSS for HTTPS)
+        console.log('Loading Memory XXL...');
+        console.log('Protocol:', window.location.protocol);
+        console.log('Host:', window.location.host);
+    </script>
+    <script src="/app.js"></script>
     <style>
         .leaderboard-filters {
             display: flex;
