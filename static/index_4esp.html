@@ -347,6 +347,7 @@
                 updateMasterStatus(data.master_connected);
                 updateRegistrationDisplay(data);
             } else if (event === 'tile_status') {
+                updateMasterStatus(data.master_connected);
                 updateRegistrationDisplay(data);
             } else if (event === 'system_status') {
                 updateRegistrationDisplay(data);

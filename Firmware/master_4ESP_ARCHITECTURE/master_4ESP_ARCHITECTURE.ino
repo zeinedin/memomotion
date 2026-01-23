@@ -59,6 +59,11 @@ int registeredTileCount = 0;
 bool wsConnected = false;
 unsigned long lastHeartbeat = 0;
 
+// ESP Hub tracking
+bool espConnected[NUM_TILE_ESPS] = {false, false, false, false};
+unsigned long espLastSeen[NUM_TILE_ESPS] = {0, 0, 0, 0};
+const unsigned long ESP_TIMEOUT = 5000; // 5 seconds
+
 // Button state tracking
 bool lastButtonState = HIGH;
 unsigned long lastButtonPress = 0;
@@ -123,7 +128,7 @@ void loop() {
   lastButtonState = currentButtonState;
 
   // --- PERIODIC STATUS UPDATE ---
-  if (wsConnected && currentMillis - lastHeartbeat > 2000) {
+  if (wsConnected && currentMillis - lastHeartbeat > 5000) { // Reduced from 2s to 5s
     sendTileStatusToBackend();
     lastHeartbeat = currentMillis;
   }
@@ -194,21 +199,50 @@ void handleRegistrationMessage(TileMessage *msg, const uint8_t *mac) {
   int tileIndex = msg->globalTileId - 1;
   if (tileIndex < 0 || tileIndex >= MAX_TILES) return;
   
+  // Mark ESP as connected when we receive registration
+  if (msg->tileEspId < NUM_TILE_ESPS) {
+    espConnected[msg->tileEspId] = true;
+    espLastSeen[msg->tileEspId] = millis();
+  }
+  
   if (!tiles[tileIndex].isRegistered) {
     tiles[tileIndex].isRegistered = true;
     registeredTileCount++;
-    Serial.printf("✓ Tile %d Registered\n", msg->globalTileId);
+    Serial.printf("✓ Tile %d Registered (ESP %d)\n", msg->globalTileId, msg->tileEspId + 1);
     
     // Flash Green ACK
     sendCommandToTile(msg->tileEspId, msg->tilePort, 1, 0, 255, 0); 
-    delay(100);
+    delay(50);
     sendCommandToTile(msg->tileEspId, msg->tilePort, 0, 0, 0, 0);
+    
+    // Send updated status to backend
+    sendTileStatusToBackend();
   }
 }
 
 void handleToggleMessage(TileMessage *msg) {
   int tileIndex = msg->globalTileId - 1;
   if (tileIndex >= 0 && tileIndex < MAX_TILES) {
+    // Auto-register if not already registered (handles master resets)
+    if (!tiles[tileIndex].isRegistered) {
+      tiles[tileIndex].isRegistered = true;
+      registeredTileCount++;
+      Serial.printf("✓ Tile %d Auto-Registered (ESP %d)\n", msg->globalTileId, msg->tileEspId + 1);
+      
+      // Mark ESP as connected
+      if (msg->tileEspId < NUM_TILE_ESPS) {
+        espConnected[msg->tileEspId] = true;
+        espLastSeen[msg->tileEspId] = millis();
+      }
+      
+      // Flash green to acknowledge registration
+      sendCommandToTile(msg->tileEspId, msg->tilePort, 1, 0, 255, 0);
+      delay(50);
+      sendCommandToTile(msg->tileEspId, msg->tilePort, 0, 0, 0, 0);
+      
+      sendTileStatusToBackend();
+    }
+    
     tiles[tileIndex].isToggledOn = (msg->value == 1);
     Serial.printf("🔄 Tile %d Step: %d\n", msg->globalTileId, msg->value);
     
@@ -226,6 +260,12 @@ void handleHeartbeatMessage(TileMessage *msg) {
   if (tileIndex >= 0 && tileIndex < MAX_TILES) {
     tiles[tileIndex].isConnected = true;
     tiles[tileIndex].lastSeen = millis();
+    
+    // Mark ESP as connected when we receive heartbeat
+    if (msg->tileEspId < NUM_TILE_ESPS) {
+      espConnected[msg->tileEspId] = true;
+      espLastSeen[msg->tileEspId] = millis();
+    }
   }
 }
 
@@ -251,6 +291,20 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
       Serial.println("✓ WebSocket Connected");
       wsConnected = true;
       digitalWrite(STATUS_LED_PIN, HIGH);
+      
+      // Send master identification message
+      {
+        String macStr = WiFi.macAddress();
+        macStr.replace(":", "");
+        String json = "{\"event\":\"master_connected\",\"data\":{\"master_id\":\"";
+        json += macStr;
+        json += "\"}}";
+        webSocket.sendTXT(json);
+        Serial.println("📤 Sent master_connected");
+      }
+      
+      // Send initial tile status
+      sendTileStatusToBackend();
       break;
     case WStype_DISCONNECTED:
       Serial.println("❌ WebSocket Disconnected");
@@ -265,7 +319,26 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
 void sendTileStatusToBackend() {
   if (!wsConnected) return;
-  String json = "{\"event\":\"tile_status\",\"data\":{\"tiles\":[";
+  
+  // Check for ESP timeouts
+  unsigned long currentMillis = millis();
+  int connectedEspCount = 0;
+  for (int i = 0; i < NUM_TILE_ESPS; i++) {
+    if (espConnected[i]) {
+      if (currentMillis - espLastSeen[i] > ESP_TIMEOUT) {
+        espConnected[i] = false;
+        Serial.printf("⚠️ ESP %d timeout\n", i + 1);
+      } else {
+        connectedEspCount++;
+      }
+    }
+  }
+  
+  // Build JSON with tile status AND ESP status
+  String json = "{\"event\":\"tile_status\",\"data\":{";
+  
+  // Tiles array
+  json += "\"tiles\":[";
   bool first = true;
   for (int i = 0; i < MAX_TILES; i++) {
     if (tiles[i].isRegistered) {
@@ -275,9 +348,25 @@ void sendTileStatusToBackend() {
       first = false;
     }
   }
-  json += "],\"registered_count\":";
+  json += "],";
+  
+  // ESP array
+  json += "\"tile_esps\":[";
+  for (int i = 0; i < NUM_TILE_ESPS; i++) {
+    if (i > 0) json += ",";
+    json += "{\"id\":"; json += (i + 1);
+    json += ",\"connected\":"; json += espConnected[i] ? "true" : "false";
+    json += "}";
+  }
+  json += "],";
+  
+  json += "\"registered_count\":";
   json += registeredTileCount;
   json += "}}";
+  
+  // Debug print
+  Serial.printf("📤 Tiles:%d ESPs:%d/%d\n", registeredTileCount, connectedEspCount, NUM_TILE_ESPS);
+  
   webSocket.sendTXT(json);
 }
 
