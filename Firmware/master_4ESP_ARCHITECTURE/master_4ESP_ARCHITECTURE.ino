@@ -373,67 +373,32 @@ void sendTileStatusToBackend() {
 void handleBackendMessage(String msg) {
   Serial.printf("📥 Backend: %s\n", msg.c_str());
   
-  // Parse JSON to extract event and pattern
+  // Parse JSON to extract event
   if (msg.indexOf("\"event\":\"game_started\"") >= 0) {
-    // Turn off all tiles first
-    Serial.println("🔴 Turning off all tiles...");
-    for (int i = 0; i < NUM_TILE_ESPS; i++) {
-      for (int port = 0; port < 4; port++) {
-        sendCommandToTile(i, port, 0, 0, 0, 0); // Turn off
-        delay(10);
-      }
-    }
-    delay(100);
-    
-    // Extract pattern array - look for "pattern":[x,y,z]
-    int patternStart = msg.indexOf("\"pattern\":[");
-    if (patternStart > 0) {
-      patternStart += 11; // Move past "pattern":[
-      int patternEnd = msg.indexOf("]", patternStart);
-      String patternStr = msg.substring(patternStart, patternEnd);
-      
-      Serial.printf("🎯 Pattern: [%s]\n", patternStr.c_str());
-      
-      // Parse tiles and show pattern
-      int tileId;
-      int idx = 0;
-      while (idx < patternStr.length()) {
-        if (patternStr[idx] >= '0' && patternStr[idx] <= '9') {
-          tileId = 0;
-          while (idx < patternStr.length() && patternStr[idx] >= '0' && patternStr[idx] <= '9') {
-            tileId = tileId * 10 + (patternStr[idx] - '0');
-            idx++;
-          }
-          
-          if (tileId >= 1 && tileId <= MAX_TILES) {
-            int tileIndex = tileId - 1;
-            uint8_t espId = tiles[tileIndex].espId;
-            uint8_t port = tiles[tileIndex].port;
-            
-            Serial.printf("💡 Lighting tile %d (ESP %d, Port %d)\n", tileId, espId + 1, port);
-            
-            // Turn on tile with cyan color
-            sendCommandToTile(espId, port, 1, 0, 255, 255); // Cyan
-            delay(800); // Show for 800ms
-            sendCommandToTile(espId, port, 0, 0, 0, 0); // Turn off
-            delay(400); // Gap between tiles
-          }
-        } else {
-          idx++;
+    // Turn off all tiles - send multiple times to ensure reliability
+    Serial.println("🔴 Game started - turning off all tiles...");
+    for (int repeat = 0; repeat < 2; repeat++) {
+      for (int i = 0; i < NUM_TILE_ESPS; i++) {
+        for (int port = 0; port < 4; port++) {
+          sendCommandToTile(i, port, 0, 0, 0, 0);
+          delay(5);
         }
       }
-      
-      Serial.println("✓ Pattern display complete");
+      delay(50);
     }
+    Serial.println("✓ All tiles off - pattern will show on website only");
   }
   else if (msg.indexOf("\"event\":\"selecting_phase\"") >= 0) {
     Serial.println("👉 Player's turn - waiting for tile selection");
-    // Turn off all tiles to prepare for player selection
-    for (int i = 0; i < NUM_TILE_ESPS; i++) {
-      for (int port = 0; port < 4; port++) {
-        sendCommandToTile(i, port, 0, 0, 0, 0);
-        delay(10);
+    // Turn off all tiles to prepare for player selection - send twice for reliability
+    for (int repeat = 0; repeat < 2; repeat++) {
+      for (int i = 0; i < NUM_TILE_ESPS; i++) {
+        for (int port = 0; port < 4; port++) {
+          sendCommandToTile(i, port, 0, 0, 0, 0);
+          delay(5);
+        }
       }
+      delay(50);
     }
   }
   else if (msg.indexOf("\"event\":\"pattern_correct\"") >= 0) {
@@ -451,18 +416,13 @@ void handleBackendMessage(String msg) {
       }
     }
   }
-  else if (msg.indexOf("\"event\":\"game_over\"") >= 0) {
-    Serial.println("❌ Game Over!");
-    // Flash all registered tiles red
-    for (int i = 0; i < MAX_TILES; i++) {
-      if (tiles[i].isRegistered) {
-        sendCommandToTile(tiles[i].espId, tiles[i].port, 1, 255, 0, 0);
-      }
-    }
-    delay(1000);
-    for (int i = 0; i < MAX_TILES; i++) {
-      if (tiles[i].isRegistered) {
-        sendCommandToTile(tiles[i].espId, tiles[i].port, 0, 0, 0, 0);
+  else if (msg.indexOf("\"event\":\"game_over\"") >= 0 || msg.indexOf("\"event\":\"end_game\"") >= 0) {
+    Serial.println("❌ Game Over - turning off all tiles");
+    // Turn off all tiles
+    for (int i = 0; i < NUM_TILE_ESPS; i++) {
+      for (int port = 0; port < 4; port++) {
+        sendCommandToTile(i, port, 0, 0, 0, 0);
+        delay(5);
       }
     }
   }
