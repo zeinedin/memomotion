@@ -435,11 +435,13 @@ function handleWebSocketMessage(message) {
       gameState.isSelectingPhase = false;
       updateGameStats();
 
-      // Pattern display disabled - no pattern shown on website
-      setMessage(
-        '🧠',
-        msgData.message || `Ronde ${msgData.round} - Memoreer het patroon!`,
-      );
+      // Show pattern on website (physical tiles stay off)
+      if (msgData.pattern) {
+        setMessage('🧠', msgData.message || `Ronde ${msgData.round}`);
+        showPatternSimultaneous(msgData.pattern);
+      } else {
+        setMessage('🚀', msgData.message || 'Game Started! Get ready...');
+      }
       break;
     case 'selecting_phase':
       // Enter tile selection phase - player can now toggle tiles
