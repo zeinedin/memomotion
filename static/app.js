@@ -1269,7 +1269,19 @@ function renderLeaderboard(container, entries, isPreview) {
     return;
   }
 
-  container.innerHTML = entries
+  // Keep only the best score per team name
+  const bestScores = {};
+  entries.forEach(entry => {
+    const teamName = entry.team_name.toLowerCase();
+    if (!bestScores[teamName] || entry.score > bestScores[teamName].score) {
+      bestScores[teamName] = entry;
+    }
+  });
+  
+  // Convert back to array and sort by score descending
+  const uniqueEntries = Object.values(bestScores).sort((a, b) => b.score - a.score);
+
+  container.innerHTML = uniqueEntries
     .map((entry, index) => {
       const rank = index + 1;
       let rankClass = '';
