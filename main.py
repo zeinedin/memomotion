@@ -167,6 +167,12 @@ async def read_css():
 async def read_tilehub_css():
     return FileResponse('static/tilehub_styles.css')
 
+@app.get("/favicon.ico")
+async def favicon():
+    """Return empty favicon to suppress 404 errors"""
+    from fastapi.responses import Response
+    return Response(status_code=204)  # No Content
+
 @app.get("/api/stats")
 async def get_stats():
     """Get game statistics"""
