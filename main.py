@@ -403,10 +403,14 @@ async def master_websocket(websocket: WebSocket):
             state.master_id = data["data"]["master_id"]
             print(f"✓ Master registered: {state.master_id}")
             
-            # Notify frontends
+            # Notify frontends with both events for compatibility
             await broadcast_to_frontends({
                 "event": "master_status",
                 "data": {"connected": True, "master_id": state.master_id}
+            })
+            await broadcast_to_frontends({
+                "event": "master_connected",
+                "data": {"master_id": state.master_id}
             })
             
             # Main loop
