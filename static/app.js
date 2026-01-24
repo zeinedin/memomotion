@@ -437,8 +437,14 @@ function handleWebSocketMessage(message) {
 
       // Show pattern on website (physical tiles stay off)
       if (msgData.pattern) {
-        setMessage('🧠', msgData.message || `Ronde ${msgData.round}`);
-        showPatternSimultaneous(msgData.pattern);
+        // Simon Says uses sequential display, others use simultaneous
+        if (gameState.mode === 'simon') {
+          setMessage('🎯', msgData.message || `Simon says: Watch carefully!`);
+          showPattern(msgData.pattern);
+        } else {
+          setMessage('🧠', msgData.message || `Ronde ${msgData.round}`);
+          showPatternSimultaneous(msgData.pattern);
+        }
       } else {
         setMessage('🚀', msgData.message || 'Game Started! Get ready...');
       }
@@ -923,26 +929,35 @@ function setMessage(icon, text) {
 
 function showPattern(pattern) {
   gameState.pattern = pattern;
-  setMessage('🧠', 'Watch the tiles light up!');
+  gameState.selectedTiles = new Set();
+  gameState.isSelectingPhase = false;
 
-  // Pattern is shown only on physical tiles, not on website
+  // Pattern display on website
   elements.stepsSection.classList.remove('visible');
 
   // Clear previous tile highlights
   document.querySelectorAll('.tile').forEach((tile) => {
-    tile.classList.remove('pattern', 'step', 'correct', 'wrong');
+    tile.classList.remove(
+      'pattern',
+      'step',
+      'correct',
+      'wrong',
+      'selected',
+      'active',
+    );
   });
 
-  // Animate pattern display on website tiles (mirror physical tiles)
+  // Animate pattern display on website tiles sequentially
+  console.log('🎯 Displaying pattern sequentially:', pattern);
   let delay = 0;
   pattern.forEach((tileId, index) => {
     setTimeout(() => {
       // Highlight tile on grid
       const tile = document.getElementById(`tile-${tileId}`);
       if (tile) {
-        tile.classList.add('pattern');
+        tile.classList.add('pattern', 'active');
         setTimeout(() => {
-          tile.classList.remove('pattern');
+          tile.classList.remove('pattern', 'active');
         }, 600);
       }
     }, delay);
