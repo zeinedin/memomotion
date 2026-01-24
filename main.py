@@ -163,6 +163,10 @@ async def read_js():
 async def read_css():
     return FileResponse('static/style.css')
 
+@app.get("/tilehub_styles.css")
+async def read_tilehub_css():
+    return FileResponse('static/tilehub_styles.css')
+
 @app.get("/api/stats")
 async def get_stats():
     """Get game statistics"""
