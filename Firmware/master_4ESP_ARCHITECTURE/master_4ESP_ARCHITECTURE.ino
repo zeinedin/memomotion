@@ -418,12 +418,16 @@ void handleBackendMessage(String msg) {
   }
   else if (msg.indexOf("\"event\":\"game_over\"") >= 0 || msg.indexOf("\"event\":\"end_game\"") >= 0) {
     Serial.println("❌ Game Over - turning off all tiles");
-    // Turn off all tiles
-    for (int i = 0; i < NUM_TILE_ESPS; i++) {
-      for (int port = 0; port < 4; port++) {
-        sendCommandToTile(i, port, 0, 0, 0, 0);
-        delay(5);
+    // Turn off all tiles - send multiple times for reliability
+    for (int repeat = 0; repeat < 3; repeat++) { // Send 3 times to ensure all tiles turn off
+      for (int i = 0; i < NUM_TILE_ESPS; i++) {
+        for (int port = 0; port < 4; port++) {
+          sendCommandToTile(i, port, 0, 0, 0, 0);
+          delay(5);
+        }
       }
+      delay(100);
     }
+    Serial.println("✓ All tiles turned off");
   }
 }
