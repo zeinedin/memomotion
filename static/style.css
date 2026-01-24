@@ -1204,13 +1204,6 @@ body {
     font-family: var(--font-display);
 }
 
-.tile.active {
-    background: linear-gradient(135deg, rgba(0, 245, 255, 0.3), rgba(255, 0, 255, 0.3));
-    border-color: var(--neon-cyan);
-    box-shadow: 0 0 30px rgba(0, 245, 255, 0.4);
-    color: var(--text-primary);
-    animation: tileActive 0.5s ease;
-}
 
 .tile.pressed {
     background: linear-gradient(135deg, rgba(0, 255, 136, 0.4), rgba(0, 245, 255, 0.4)) !important;
