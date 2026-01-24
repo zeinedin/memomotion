@@ -620,9 +620,9 @@ function updateTileStatus(connectedTiles) {
   console.log('🎯 updateTileStatus called:', { connectedTiles });
 
   gameState.connectedTiles = connectedTiles || [];
-  const TOTAL_TILES = 16; // Always expect 16 tiles
+  const TOTAL_TILES = 12; // Always expect 12 tiles
 
-  // Update status display - show connected out of 16
+  // Update status display - show connected out of 12
   const connected = gameState.connectedTiles.length;
 
   console.log(`🎯 Tiles: ${connected}/${TOTAL_TILES}`);
@@ -651,10 +651,10 @@ function updateTileStatus(connectedTiles) {
 
 function buildTileGrid() {
   const grid = elements.tileGrid;
-  const TOTAL_TILES = 16; // Always show 16 tiles
+  const TOTAL_TILES = 12; // Always show 12 tiles
   const connectedSet = new Set(gameState.connectedTiles);
 
-  // Create array of all 16 tile IDs (1-16)
+  // Create array of all 12 tile IDs (1-12)
   const allTiles = Array.from({ length: TOTAL_TILES }, (_, i) => i + 1);
 
   // Check if tile list display needs update
@@ -670,7 +670,7 @@ function buildTileGrid() {
     // Save current selected state
     const currentlySelected = new Set(gameState.selectedTiles);
 
-    // Create all 16 tile elements - mark offline tiles differently
+    // Create all 12 tile elements - mark offline tiles differently
     grid.innerHTML = allTiles
       .map((tileId) => {
         const isConnected = connectedSet.has(tileId);
@@ -693,7 +693,7 @@ function buildTileGrid() {
       })
       .join('');
 
-    // Fixed 4x4 grid for 16 tiles
+    // Fixed 3x4 grid for 12 tiles
     grid.style.gridTemplateColumns = 'repeat(4, minmax(80px, 1fr))';
   } else {
     // Just update the connected/offline status without full rebuild

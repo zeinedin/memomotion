@@ -95,8 +95,8 @@ void setup() {
   // Initialize tile array
   for (int i = 0; i < MAX_TILES; i++) {
     tiles[i].globalId = i + 1;
-    tiles[i].espId = i / 3;
-    tiles[i].port = i % 3;
+    tiles[i].espId = i / 4;  // FIXED: Each hub has 4 tiles, not 3
+    tiles[i].port = i % 4;   // FIXED: Port 0-3, not 0-2
     tiles[i].isRegistered = false;
     tiles[i].isConnected = false;
     tiles[i].lastSeen = 0;
