@@ -18,6 +18,7 @@ const gameState = {
   masterConnected: false,
   isPlaying: false,
   isSelectingPhase: false, // True during tile selection phase
+  isShowingPattern: false, // True during pattern display - blocks interaction
   scoreSubmitted: false, // Prevent duplicate score submissions
   leaderboardFilter: 'all', // Current leaderboard level filter
 };
@@ -452,7 +453,9 @@ function handleWebSocketMessage(message) {
     case 'selecting_phase':
       // Enter tile selection phase - player can now toggle tiles
       gameState.isSelectingPhase = true;
+      gameState.isShowingPattern = false; // Ensure pattern display is done
       gameState.selectedTiles = new Set();
+      gameState.playerSteps = []; // Reset sequence for Simon Says
       setMessage('👆', msgData.message || 'Selecteer de juiste tegels!');
       startSelectingPhase(
         msgData.pattern_length || LEVEL_CONFIG[gameState.level].steps,
@@ -931,6 +934,7 @@ function showPattern(pattern) {
   gameState.pattern = pattern;
   gameState.selectedTiles = new Set();
   gameState.isSelectingPhase = false;
+  gameState.isShowingPattern = true; // Block interaction during pattern display
 
   // Pattern display on website
   elements.stepsSection.classList.remove('visible');
@@ -950,6 +954,8 @@ function showPattern(pattern) {
   // Animate pattern display on website tiles sequentially
   console.log('🎯 Displaying pattern sequentially:', pattern);
   let delay = 0;
+  const totalDuration = pattern.length * 800 + 600; // Total time for pattern display
+
   pattern.forEach((tileId, index) => {
     setTimeout(() => {
       // Highlight tile on grid
@@ -963,6 +969,12 @@ function showPattern(pattern) {
     }, delay);
     delay += 800;
   });
+
+  // Re-enable interaction after pattern completes
+  setTimeout(() => {
+    gameState.isShowingPattern = false;
+    console.log('✅ Pattern display complete - interaction enabled');
+  }, totalDuration);
 }
 
 // ============================================
@@ -1048,6 +1060,29 @@ function startSelectingPhase(expectedCount) {
 
 function handleTileToggled(tileId, isSelected, selectedTiles, expectedCount) {
   console.log('🔄 Tile', tileId, 'reports:', isSelected ? 'ON (green)' : 'OFF');
+
+  // Block interaction during pattern display
+  if (gameState.isShowingPattern) {
+    console.log('⛔ Tile interaction blocked - pattern is displaying');
+    return;
+  }
+
+  // For Simon Says, track sequence order
+  if (gameState.mode === 'simon' && isSelected) {
+    gameState.playerSteps.push(tileId);
+    console.log(
+      '🎯 Simon Says step:',
+      gameState.playerSteps.length,
+      '- Tile',
+      tileId,
+    );
+  } else if (gameState.mode === 'simon' && !isSelected) {
+    // Remove from sequence if turned off
+    const index = gameState.playerSteps.indexOf(tileId);
+    if (index > -1) {
+      gameState.playerSteps.splice(index, 1);
+    }
+  }
 
   // Mirror the tile's state - tile is authoritative
   if (isSelected) {

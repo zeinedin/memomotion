@@ -111,12 +111,13 @@ class GameState:
         # Game states
         self.game_phase: str = "idle"  # idle, showing_pattern, selecting, checking
         self.pattern: List[int] = []
-        self.player_steps: List[int] = []
+        self.player_steps: List[int] = []  # For Simon Says - tracks sequence order
         self.selected_tiles: set = set()  # Tiles currently selected by player (toggle mode)
         
         # Team info
         self.current_team: str = ""
         self.current_level: str = "easy"
+        self.current_mode: str = "classic"  # classic, speedrun, endless, simon
         self.score_submitted: bool = False  # Prevent duplicate score submissions
         
         self.games_played = 0
@@ -597,13 +598,14 @@ async def handle_frontend_message(msg: dict, websocket: WebSocket):
         # Register team and level (handle both nested and flat formats)
         state.current_team = data.get("team_name", msg.get("team_name", "Team"))
         state.current_level = data.get("level", msg.get("level", "easy"))
+        state.current_mode = data.get("mode", msg.get("mode", "classic"))  # Get game mode
         state.current_score = 0
         state.round_number = 0
         state.game_phase = "idle"
         state.player_steps = []
         state.pattern = []
         state.score_submitted = False  # Reset for new game
-        print(f"→ New game registered: {state.current_team} ({state.current_level})")
+        print(f"→ New game registered: {state.current_team} ({state.current_level}) - Mode: {state.current_mode}")
         
         # Send confirmation to frontend
         await websocket.send_json({
@@ -725,18 +727,33 @@ async def handle_tile_toggle(data: dict):
         is_selected = data.get("is_on", False)
         if is_selected:
             state.selected_tiles.add(tile_id)
+            # For Simon Says, track the sequence order
+            if state.current_mode == "simon":
+                state.player_steps.append(tile_id)
+                print(f"  Simon Says step {len(state.player_steps)}: Tile {tile_id}")
         else:
             state.selected_tiles.discard(tile_id)
+            # For Simon Says, remove from sequence
+            if state.current_mode == "simon" and tile_id in state.player_steps:
+                state.player_steps.remove(tile_id)
+                print(f"  Removed tile {tile_id} from Simon Says sequence")
         print(f"  Tile {tile_id} {'SELECTED' if is_selected else 'DESELECTED'} (from tile, total: {len(state.selected_tiles)})")
     else:
         # Fallback: Toggle tile selection
         if tile_id in state.selected_tiles:
             state.selected_tiles.remove(tile_id)
             is_selected = False
+            # For Simon Says, remove from sequence
+            if state.current_mode == "simon" and tile_id in state.player_steps:
+                state.player_steps.remove(tile_id)
             print(f"  Tile {tile_id} DESELECTED (total: {len(state.selected_tiles)})")
         else:
             state.selected_tiles.add(tile_id)
             is_selected = True
+            # For Simon Says, track the sequence order
+            if state.current_mode == "simon":
+                state.player_steps.append(tile_id)
+                print(f"  Simon Says step {len(state.player_steps)}: Tile {tile_id}")
             print(f"  Tile {tile_id} SELECTED (total: {len(state.selected_tiles)})")
         
         # Tell master to toggle LED on tile (only if we calculated the toggle)
@@ -773,9 +790,17 @@ async def handle_confirm_button():
     
     state.game_phase = "checking"
     
-    # Check if selected tiles match pattern (order doesn't matter)
-    pattern_set = set(state.pattern)
-    correct = state.selected_tiles == pattern_set
+    # For Simon Says, check sequence ORDER, not just the set
+    if state.current_mode == "simon":
+        print(f"  Simon Says sequence: {state.player_steps}")
+        print(f"  Expected pattern: {state.pattern}")
+        correct = state.player_steps == state.pattern
+        if not correct:
+            print(f"  ✗ WRONG ORDER! Player: {state.player_steps}, Expected: {state.pattern}")
+    else:
+        # For other modes, check if selected tiles match pattern (order doesn't matter)
+        pattern_set = set(state.pattern)
+        correct = state.selected_tiles == pattern_set
     
     # Get level config for scoring
     level_config = LEVEL_CONFIG.get(state.current_level, LEVEL_CONFIG["easy"])
