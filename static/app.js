@@ -435,13 +435,11 @@ function handleWebSocketMessage(message) {
       gameState.isSelectingPhase = false;
       updateGameStats();
 
-      // Check if pattern should be shown simultaneously
-      if (msgData.display_mode === 'simultaneous' && msgData.pattern) {
-        setMessage('🧠', msgData.message || `Ronde ${msgData.round}`);
-        showPatternSimultaneous(msgData.pattern);
-      } else {
-        setMessage('🚀', msgData.message || 'Game Started! Get ready...');
-      }
+      // Pattern display disabled - no pattern shown on website
+      setMessage(
+        '🧠',
+        msgData.message || `Ronde ${msgData.round} - Memoreer het patroon!`,
+      );
       break;
     case 'selecting_phase':
       // Enter tile selection phase - player can now toggle tiles
@@ -1271,15 +1269,17 @@ function renderLeaderboard(container, entries, isPreview) {
 
   // Keep only the best score per team name
   const bestScores = {};
-  entries.forEach(entry => {
+  entries.forEach((entry) => {
     const teamName = entry.team_name.toLowerCase();
     if (!bestScores[teamName] || entry.score > bestScores[teamName].score) {
       bestScores[teamName] = entry;
     }
   });
-  
+
   // Convert back to array and sort by score descending
-  const uniqueEntries = Object.values(bestScores).sort((a, b) => b.score - a.score);
+  const uniqueEntries = Object.values(bestScores).sort(
+    (a, b) => b.score - a.score,
+  );
 
   container.innerHTML = uniqueEntries
     .map((entry, index) => {
