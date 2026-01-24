@@ -1067,8 +1067,13 @@ function handleTileToggled(tileId, isSelected, selectedTiles, expectedCount) {
     return;
   }
 
-  // For Simon Says, track sequence order
-  if (gameState.mode === 'simon' && isSelected) {
+  // For Simon Says, prevent deselection (sequence cannot be undone)
+  if (gameState.mode === 'simon') {
+    if (!isSelected) {
+      console.log('⛔ Simon Says: Cannot uncheck tiles - sequence is locked');
+      return;
+    }
+    // Track sequence order
     gameState.playerSteps.push(tileId);
     console.log(
       '🎯 Simon Says step:',
@@ -1076,12 +1081,6 @@ function handleTileToggled(tileId, isSelected, selectedTiles, expectedCount) {
       '- Tile',
       tileId,
     );
-  } else if (gameState.mode === 'simon' && !isSelected) {
-    // Remove from sequence if turned off
-    const index = gameState.playerSteps.indexOf(tileId);
-    if (index > -1) {
-      gameState.playerSteps.splice(index, 1);
-    }
   }
 
   // Mirror the tile's state - tile is authoritative

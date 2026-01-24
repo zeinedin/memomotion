@@ -725,6 +725,12 @@ async def handle_tile_toggle(data: dict):
     if "is_on" in data:
         # Trust the tile's LED state (tile is authoritative)
         is_selected = data.get("is_on", False)
+        
+        # For Simon Says, prevent deselection (sequence cannot be undone)
+        if state.current_mode == "simon" and not is_selected:
+            print(f"  ⛔ Simon Says: Ignoring deselection of tile {tile_id} - sequence is locked")
+            return
+        
         if is_selected:
             state.selected_tiles.add(tile_id)
             # For Simon Says, track the sequence order
@@ -733,19 +739,16 @@ async def handle_tile_toggle(data: dict):
                 print(f"  Simon Says step {len(state.player_steps)}: Tile {tile_id}")
         else:
             state.selected_tiles.discard(tile_id)
-            # For Simon Says, remove from sequence
-            if state.current_mode == "simon" and tile_id in state.player_steps:
-                state.player_steps.remove(tile_id)
-                print(f"  Removed tile {tile_id} from Simon Says sequence")
         print(f"  Tile {tile_id} {'SELECTED' if is_selected else 'DESELECTED'} (from tile, total: {len(state.selected_tiles)})")
     else:
         # Fallback: Toggle tile selection
         if tile_id in state.selected_tiles:
+            # For Simon Says, prevent deselection
+            if state.current_mode == "simon":
+                print(f"  ⛔ Simon Says: Cannot deselect tile {tile_id} - sequence is locked")
+                return
             state.selected_tiles.remove(tile_id)
             is_selected = False
-            # For Simon Says, remove from sequence
-            if state.current_mode == "simon" and tile_id in state.player_steps:
-                state.player_steps.remove(tile_id)
             print(f"  Tile {tile_id} DESELECTED (total: {len(state.selected_tiles)})")
         else:
             state.selected_tiles.add(tile_id)
