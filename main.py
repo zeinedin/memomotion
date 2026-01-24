@@ -646,25 +646,32 @@ async def handle_start_button():
 
 async def start_show_pattern(connected_tiles: List[int]):
     """Generate and show pattern - all tiles at once for 8 seconds"""
-    print("→ Showing pattern for 8 seconds...")
+    print("→ Showing pattern...")
     
     state.game_phase = "showing_pattern"
     state.player_steps = []
     state.selected_tiles = set()  # Clear selected tiles
     state.round_number += 1
     
-    # Get pattern length from level config + round progression
-    # Pattern grows by 1 each round: base + (round - 1)
-    level_config = LEVEL_CONFIG.get(state.current_level, LEVEL_CONFIG["easy"])
-    base_pattern = level_config["pattern_length"]
-    pattern_length = base_pattern + (state.round_number - 1)
+    # Calculate pattern length based on game mode
+    if state.current_mode == "simon":
+        # Simon Says: starts with 1, grows by 1 each round
+        pattern_length = state.round_number
+    elif state.current_mode == "endless":
+        # Endless: starts with 2, grows by 1 each round
+        pattern_length = 1 + state.round_number
+    else:
+        # Classic/Speedrun: use level config, no growth
+        level_config = LEVEL_CONFIG.get(state.current_level, LEVEL_CONFIG["easy"])
+        pattern_length = level_config["pattern_length"]
+    
     # Cap at number of connected tiles
     pattern_length = min(pattern_length, len(connected_tiles))
     
     # Generate pattern (unique tiles)
     state.pattern = random.sample(connected_tiles, pattern_length)
     
-    print(f"  Pattern: {state.pattern} (Level: {state.current_level}, Round: {state.round_number}, Size: {pattern_length})")
+    print(f"  Pattern: {state.pattern} (Mode: {state.current_mode}, Level: {state.current_level}, Round: {state.round_number}, Size: {pattern_length})")
     
     # Tell frontend - show all pattern tiles at once
     await broadcast_to_frontends({
