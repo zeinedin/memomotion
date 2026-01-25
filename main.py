@@ -268,7 +268,9 @@ async def get_status():
         "master_connected": state.master_id is not None,
         "frontends": len(state.frontend_connections),
         "tiles_connected": state.get_connected_count(),
+        "connected_tiles": state.get_connected_count(),  # Alias for admin page
         "total_tiles": TOTAL_TILES,
+        "games_played": state.games_played,
         "game_phase": state.game.phase.value,
         "cosmos_db": cosmos_initialized
     }
@@ -627,11 +629,17 @@ async def master_websocket(websocket: WebSocket):
     finally:
         state.master_ws = None
         state.master_id = None
-        # Don't clear tiles immediately - they may reconnect
+        # Clear all tiles - if Master is disconnected, tiles can't be online
+        for tid in state.tiles:
+            state.tiles[tid].connected = False
+        state._last_tile_status = {}  # Force status broadcast
+        logger.info("✗ All tiles marked offline (Master disconnected)")
         await broadcast_to_frontends({
             "event": "master_status",
             "data": {"connected": False}
         })
+        # Broadcast updated tile status showing all offline
+        await broadcast_tile_status(force=True)
 
 async def handle_master_message(msg: dict):
     """Handle messages from master ESP"""
@@ -763,6 +771,20 @@ async def handle_frontend_message(msg: dict, websocket: WebSocket):
         })
 
 # ==================== ADMIN API ====================
+
+# Admin-configurable settings (separate from constants)
+admin_config = {
+    "levels": {
+        "easy": {"steps": 4, "points": 10},
+        "medium": {"steps": 6, "points": 15},
+        "hard": {"steps": 8, "points": 25}
+    },
+    "speedRun": {
+        "timePerStep": 3,
+        "bonusPerSecond": 2
+    }
+}
+
 @app.get("/api/admin/tiles")
 async def get_tiles_admin():
     return {
@@ -775,10 +797,99 @@ async def get_tiles_admin():
 @app.get("/api/admin/config")
 async def get_config():
     return {
-        "levels": LEVEL_CONFIG,
+        "levels": admin_config["levels"],
+        "speedRun": admin_config["speedRun"],
         "wrongPenalty": WRONG_PENALTY,
         "totalTiles": TOTAL_TILES
     }
+
+@app.post("/api/admin/config/levels")
+async def save_level_config(config: dict):
+    """Save level configuration"""
+    try:
+        admin_config["levels"] = {
+            "easy": {
+                "steps": config.get("easy", {}).get("steps", 4),
+                "points": config.get("easy", {}).get("points", 10)
+            },
+            "medium": {
+                "steps": config.get("medium", {}).get("steps", 6),
+                "points": config.get("medium", {}).get("points", 15)
+            },
+            "hard": {
+                "steps": config.get("hard", {}).get("steps", 8),
+                "points": config.get("hard", {}).get("points", 25)
+            }
+        }
+        logger.info(f"Level config updated: {admin_config['levels']}")
+        return {"status": "ok", "config": admin_config["levels"]}
+    except Exception as e:
+        logger.error(f"Failed to save level config: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/admin/config/speedrun")
+async def save_speedrun_config(config: dict):
+    """Save speed run configuration"""
+    try:
+        admin_config["speedRun"] = {
+            "timePerStep": config.get("timePerStep", 3),
+            "bonusPerSecond": config.get("bonusPerSecond", 2)
+        }
+        logger.info(f"Speed run config updated: {admin_config['speedRun']}")
+        return {"status": "ok", "config": admin_config["speedRun"]}
+    except Exception as e:
+        logger.error(f"Failed to save speed run config: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.delete("/api/admin/leaderboard/{score_id}")
+async def delete_single_score(score_id: str):
+    """Delete a single score from leaderboard"""
+    global in_memory_leaderboard
+    
+    if cosmos_initialized and container:
+        try:
+            # Try to find and delete from Cosmos DB
+            query = "SELECT * FROM c WHERE c.id = @id"
+            items = list(container.query_items(
+                query=query,
+                parameters=[{"name": "@id", "value": score_id}],
+                enable_cross_partition_query=True
+            ))
+            
+            if items:
+                item = items[0]
+                container.delete_item(item=item['id'], partition_key=item.get('team_name', item['id']))
+                logger.info(f"✓ Deleted score {score_id} from Cosmos DB")
+                return {"status": "ok", "message": "Score deleted"}
+        except Exception as e:
+            logger.error(f"Failed to delete from Cosmos DB: {e}")
+            # Fall through to try in-memory deletion
+    
+    # Try in-memory deletion
+    original_length = len(in_memory_leaderboard)
+    
+    # Try to find by id (string) or by index (number)
+    try:
+        # First try as string id
+        in_memory_leaderboard = [e for e in in_memory_leaderboard if e.get("id") != score_id]
+        
+        # If that didn't work, try as index
+        if len(in_memory_leaderboard) == original_length:
+            try:
+                index = int(score_id)
+                if 0 <= index < len(in_memory_leaderboard):
+                    del in_memory_leaderboard[index]
+                    logger.info(f"✓ Deleted score at index {index} from memory")
+                    return {"status": "ok", "message": "Score deleted"}
+            except ValueError:
+                pass
+        else:
+            logger.info(f"✓ Deleted score {score_id} from memory")
+            return {"status": "ok", "message": "Score deleted"}
+    except Exception as e:
+        logger.error(f"Delete error: {e}")
+    
+    return {"status": "error", "message": "Score not found"}
 
 @app.post("/api/admin/reset")
 async def admin_reset():

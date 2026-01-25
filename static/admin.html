@@ -489,8 +489,9 @@
                 document.getElementById('masterStatus').textContent = data.master_connected ? 'ON' : 'OFF';
                 document.getElementById('masterStatus').className = 'status-value ' + (data.master_connected ? 'online' : 'offline');
 
-                document.getElementById('tilesConnected').textContent = data.connected_tiles || 0;
+                document.getElementById('tilesConnected').textContent = data.connected_tiles || data.tiles_connected || 0;
                 document.getElementById('frontendsConnected').textContent = data.frontends || 0;
+                document.getElementById('gamesPlayed').textContent = data.games_played || 0;
 
                 // Load tiles
                 await loadTiles();
@@ -633,7 +634,7 @@
                         <td>${entry.rounds}</td>
                         <td>${formatDate(entry.created_at)}</td>
                         <td>
-                            <button class="delete-btn" onclick="deleteScore(${entry.id || index}, '${escapeHtml(entry.team_name)}')">
+                            <button class="delete-btn" onclick="deleteScore('${entry.id || index}', '${escapeHtml(entry.team_name)}')">
                                 🗑️
                             </button>
                         </td>
