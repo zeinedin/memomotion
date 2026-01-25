@@ -505,7 +505,7 @@ async def handle_correct_pattern():
     
     logger.info(f"✓ Correct! +{points} points. Total: {state.game.score}")
     
-    # Tell master
+    # Tell master - pattern_correct will flash green then turn off
     await send_to_master({"event": "pattern_correct", "data": {}})
     
     await broadcast_to_frontends({
@@ -521,7 +521,9 @@ async def handle_correct_pattern():
     # Brief pause then next round
     await asyncio.sleep(2)
     
-    # Turn off tiles
+    # Ensure tiles are off before next round (send twice for reliability)
+    await send_to_master({"event": "clear_tiles", "data": {}})
+    await asyncio.sleep(0.2)
     await send_to_master({"event": "clear_tiles", "data": {}})
     
     # Start next round automatically
@@ -538,8 +540,10 @@ async def end_game_wrong():
     
     logger.info(f"✗ Wrong! Final score: {state.game.score}")
     
-    # Tell master
+    # Tell master to turn off all tiles (send twice for reliability)
     await send_to_master({"event": "game_over", "data": {}})
+    await asyncio.sleep(0.2)
+    await send_to_master({"event": "clear_tiles", "data": {}})
     
     # Save score
     await save_score()
@@ -659,6 +663,8 @@ async def handle_master_message(msg: dict):
             # Start first round
             await start_new_round()
         elif state.game.phase == GamePhase.SELECTING:
+            # Clear tiles immediately before validating
+            await send_to_master({"event": "clear_tiles", "data": {}})
             # Confirm selection
             await validate_selection()
         elif state.game.phase == GamePhase.IDLE:
