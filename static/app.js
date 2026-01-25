@@ -443,11 +443,13 @@ function handleGameOver(data) {
 
 // ==================== UI UPDATES ====================
 function updateConnectionUI() {
-    // Master status
-    if (gameState.masterConnected) {
+    // Master status - consider connected if we have tiles OR explicit master connection
+    const hasConnection = gameState.masterConnected || gameState.connectedTiles.length > 0;
+    
+    if (hasConnection) {
         elements.masterDot?.classList.add('connected');
         if (elements.masterStatus) {
-            elements.masterStatus.textContent = 'Master: Connected ✓';
+            elements.masterStatus.textContent = gameState.masterConnected ? 'Master: Connected ✓' : 'Master: Active';
         }
     } else {
         elements.masterDot?.classList.remove('connected');

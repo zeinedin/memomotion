@@ -191,18 +191,24 @@ async def send_to_master(message: dict):
     return False
 
 def calculate_pattern_length() -> int:
-    """Calculate pattern length based on mode, level, and round"""
+    """Calculate pattern length based on mode, level, and round
+    
+    Progressive difficulty: starts with base pattern and adds 1 tile each round
+    """
     base = LEVEL_CONFIG[state.game.level]["base_pattern"]
+    max_tiles = state.get_connected_count()
     
     if state.game.mode == GameMode.SIMON:
         # Simon Says: starts at 1, grows by 1 each round
-        return min(state.game.round_number, state.get_connected_count())
+        return min(state.game.round_number, max_tiles)
     elif state.game.mode == GameMode.ENDLESS:
         # Endless: starts at 2, grows each round
-        return min(1 + state.game.round_number, state.get_connected_count())
+        return min(1 + state.game.round_number, max_tiles)
     else:
-        # Classic/Speedrun: fixed based on level
-        return min(base, state.get_connected_count())
+        # Classic/Speedrun: starts at base, adds 1 tile per round (progressive difficulty)
+        # Round 1: base tiles, Round 2: base+1, Round 3: base+2, etc.
+        pattern_length = base + (state.game.round_number - 1)
+        return min(pattern_length, max_tiles)
 
 def calculate_points(correct: bool) -> int:
     """Calculate points for round"""
@@ -374,7 +380,7 @@ async def start_new_round():
     pattern_length = calculate_pattern_length()
     state.game.pattern = random.sample(connected, min(pattern_length, len(connected)))
     
-    logger.info(f"Round {state.game.round_number}: Pattern {state.game.pattern} (mode={state.game.mode.value})")
+    logger.info(f"Round {state.game.round_number}: Pattern {state.game.pattern} (length={len(state.game.pattern)}, mode={state.game.mode.value})")
     
     # Determine display mode
     display_mode = "sequential" if state.game.mode == GameMode.SIMON else "simultaneous"
@@ -386,11 +392,12 @@ async def start_new_round():
         "data": {
             "phase": "showing_pattern",
             "pattern": state.game.pattern,
+            "pattern_length": len(state.game.pattern),
             "round": state.game.round_number,
             "score": state.game.score,
             "display_mode": display_mode,
             "show_time": show_time,
-            "message": f"Ronde {state.game.round_number}"
+            "message": f"Ronde {state.game.round_number} - Onthoud {len(state.game.pattern)} tegels!"
         }
     })
     
