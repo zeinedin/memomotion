@@ -381,21 +381,16 @@ void handleButton() {
             Serial.println("🔘 START button pressed");
             
             // 1. ALWAYS NOTIFY BACKEND FIRST
-            // Let backend handle game logic and send clear command back
             if (wsConnected) {
                 wsSendJson("start_button_pressed", "{}");
             } else {
                 Serial.println("⚠️ WebSocket not connected");
             }
             
-            // 2. IMMEDIATE LOCAL CLEAR if game is active
-            // This provides instant feedback while backend processes
-            if (gameActive) {
-                Serial.println("📡 Game Active: Clearing Tiles...");
-                turnAllTilesOff();
-            } else {
-                Serial.println("ℹ️ Game Idle: Skipping LED clear");
-            }
+            // 2. ALWAYS TURN OFF ALL TILES when button is pressed
+            // This ensures tiles are cleared on confirm, regardless of state tracking
+            Serial.println("📡 Clearing ALL Tiles...");
+            turnAllTilesOff();
             
             lastButtonPress = now;
         }
