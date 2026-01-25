@@ -27,6 +27,18 @@
     --radius-sm: 8px;
     --radius-md: 12px;
     --radius-lg: 20px;
+
+    /* Gradient variables for buttons */
+    --gradient-primary: linear-gradient(135deg, var(--neon-cyan), var(--neon-magenta));
+    --gradient-success: linear-gradient(135deg, var(--neon-green), #00cc6a);
+    --gradient-danger: linear-gradient(135deg, var(--neon-red), #cc0033);
+
+    /* Spacing */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
 }
 
 *,
@@ -383,6 +395,28 @@ body {
 .btn-secondary:hover {
     background: rgba(255, 255, 255, 0.15);
     border-color: var(--neon-cyan);
+}
+
+.btn-success {
+    background: var(--gradient-success);
+    color: var(--bg-dark);
+    border: none;
+}
+
+.btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 25px rgba(0, 255, 136, 0.5);
+}
+
+.btn-danger {
+    background: var(--gradient-danger);
+    color: var(--text-primary);
+    border: none;
+}
+
+.btn-danger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 25px rgba(255, 0, 68, 0.5);
 }
 
 .btn-icon {

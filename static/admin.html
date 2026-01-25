@@ -7,78 +7,83 @@
     <title>Memory XXL - Admin Dashboard</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@400;500;600;700&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Admin specific styles */
         .admin-container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
-            padding: var(--space-lg);
+            padding: 1.5rem;
         }
 
         .admin-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: var(--space-xl);
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
         }
 
         .admin-title {
             font-family: var(--font-display);
-            font-size: 2rem;
-            background: var(--gradient-primary);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            font-size: 1.8rem;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 20px var(--neon-cyan);
         }
 
         .admin-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: var(--space-lg);
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
         }
 
         .admin-card {
             background: var(--card-bg);
             border: 1px solid var(--card-border);
-            border-radius: var(--radius-lg);
-            padding: var(--space-xl);
+            border-radius: 12px;
+            padding: 1.5rem;
             backdrop-filter: blur(20px);
+        }
+
+        .admin-card.full-width {
+            grid-column: 1 / -1;
         }
 
         .admin-card h3 {
             font-family: var(--font-display);
-            font-size: 1.1rem;
-            margin-bottom: var(--space-lg);
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            color: var(--neon-cyan);
             display: flex;
             align-items: center;
-            gap: var(--space-sm);
+            gap: 0.5rem;
         }
 
         .status-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: var(--space-md);
+            gap: 1rem;
         }
 
         .status-item {
             background: rgba(0, 0, 0, 0.3);
-            padding: var(--space-md);
-            border-radius: var(--radius-sm);
+            padding: 1rem;
+            border-radius: 8px;
             text-align: center;
         }
 
         .status-value {
             font-family: var(--font-display);
-            font-size: 2rem;
+            font-size: 1.5rem;
             font-weight: 700;
             display: block;
+            margin-bottom: 0.25rem;
         }
 
         .status-value.online {
             color: var(--neon-green);
+            text-shadow: 0 0 10px var(--neon-green);
         }
 
         .status-value.offline {
@@ -86,7 +91,7 @@
         }
 
         .status-label {
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.1em;
@@ -95,31 +100,32 @@
         .config-form {
             display: flex;
             flex-direction: column;
-            gap: var(--space-md);
+            gap: 0.75rem;
         }
 
         .config-row {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: var(--space-sm) 0;
+            padding: 0.5rem 0;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .config-row:last-child {
+        .config-row:last-of-type {
             border-bottom: none;
         }
 
         .config-label {
             font-weight: 500;
+            font-size: 0.9rem;
         }
 
         .config-input {
-            width: 80px;
-            padding: var(--space-sm);
-            background: rgba(0, 0, 0, 0.3);
+            width: 70px;
+            padding: 0.5rem;
+            background: rgba(0, 0, 0, 0.4);
             border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: var(--radius-sm);
+            border-radius: 6px;
             color: var(--text-primary);
             font-family: var(--font-display);
             font-size: 1rem;
@@ -129,99 +135,167 @@
         .config-input:focus {
             outline: none;
             border-color: var(--neon-cyan);
-        }
-
-        .leaderboard-actions {
-            display: flex;
-            gap: var(--space-md);
-            margin-bottom: var(--space-lg);
-        }
-
-        .leaderboard-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .leaderboard-table th,
-        .leaderboard-table td {
-            padding: var(--space-sm) var(--space-md);
-            text-align: left;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .leaderboard-table th {
-            font-family: var(--font-display);
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-        }
-
-        .leaderboard-table tr:hover td {
-            background: rgba(0, 245, 255, 0.1);
-        }
-
-        .delete-btn {
-            background: rgba(255, 0, 68, 0.2);
-            border: 1px solid var(--neon-red);
-            color: var(--neon-red);
-            padding: 4px 8px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.8rem;
-        }
-
-        .delete-btn:hover {
-            background: rgba(255, 0, 68, 0.4);
-        }
-
-        .btn-danger {
-            background: var(--gradient-danger);
-            color: white;
-        }
-
-        .btn-success {
-            background: var(--gradient-success);
-            color: var(--bg-dark);
+            box-shadow: 0 0 10px rgba(0, 245, 255, 0.3);
         }
 
         .tile-grid-admin {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
-            gap: var(--space-sm);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
         }
 
         .tile-status {
-            width: 60px;
-            height: 60px;
+            width: 50px;
+            height: 50px;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: var(--radius-sm);
+            border-radius: 8px;
             font-family: var(--font-display);
             font-weight: 700;
+            font-size: 1.1rem;
         }
 
         .tile-status.connected {
             background: rgba(0, 255, 136, 0.2);
             border: 2px solid var(--neon-green);
             color: var(--neon-green);
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.3);
         }
 
         .tile-status.disconnected {
-            background: rgba(255, 0, 68, 0.1);
-            border: 2px solid rgba(255, 0, 68, 0.3);
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.2);
             color: var(--text-muted);
+        }
+
+        .leaderboard-actions {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        .leaderboard-table th,
+        .leaderboard-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .leaderboard-table th {
+            font-family: var(--font-display);
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .leaderboard-table tbody tr:hover {
+            background: rgba(0, 245, 255, 0.05);
+        }
+
+        .delete-btn {
+            background: rgba(255, 0, 68, 0.2);
+            border: 1px solid var(--neon-red);
+            color: var(--neon-red);
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .delete-btn:hover {
+            background: rgba(255, 0, 68, 0.4);
+            box-shadow: 0 0 10px rgba(255, 0, 68, 0.3);
+        }
+
+        .save-btn {
+            margin-top: 1rem;
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, var(--neon-green), #00cc6a);
+            border: none;
+            border-radius: 8px;
+            color: #000;
+            font-family: var(--font-display);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        .save-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+        }
+
+        .refresh-btn {
+            padding: 0.75rem 1.5rem;
+            background: rgba(0, 245, 255, 0.1);
+            border: 1px solid var(--neon-cyan);
+            border-radius: 8px;
+            color: var(--neon-cyan);
+            font-family: var(--font-display);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background: rgba(0, 245, 255, 0.2);
+            box-shadow: 0 0 15px rgba(0, 245, 255, 0.3);
+        }
+
+        .danger-btn {
+            padding: 0.75rem 1.5rem;
+            background: rgba(255, 0, 68, 0.1);
+            border: 1px solid var(--neon-red);
+            border-radius: 8px;
+            color: var(--neon-red);
+            font-family: var(--font-display);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .danger-btn:hover {
+            background: rgba(255, 0, 68, 0.2);
+            box-shadow: 0 0 15px rgba(255, 0, 68, 0.3);
+        }
+
+        .back-btn {
+            padding: 0.75rem 1.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: var(--font-display);
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: var(--neon-cyan);
         }
 
         .log-container {
             background: rgba(0, 0, 0, 0.4);
-            border-radius: var(--radius-sm);
-            padding: var(--space-md);
+            border-radius: 8px;
+            padding: 1rem;
             max-height: 200px;
             overflow-y: auto;
             font-family: monospace;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
         }
 
         .log-entry {
@@ -231,29 +305,18 @@
 
         .log-time {
             color: var(--text-muted);
-            margin-right: var(--space-sm);
+            margin-right: 0.75rem;
         }
 
-        .log-message.info {
-            color: var(--neon-cyan);
-        }
-
-        .log-message.success {
-            color: var(--neon-green);
-        }
-
-        .log-message.warning {
-            color: var(--neon-orange);
-        }
-
-        .log-message.error {
-            color: var(--neon-red);
-        }
+        .log-message.info { color: var(--neon-cyan); }
+        .log-message.success { color: var(--neon-green); }
+        .log-message.warning { color: var(--neon-orange); }
+        .log-message.error { color: var(--neon-red); }
 
         .refresh-indicator {
             display: inline-flex;
             align-items: center;
-            gap: var(--space-sm);
+            gap: 0.5rem;
             font-size: 0.85rem;
             color: var(--text-muted);
         }
@@ -266,14 +329,19 @@
             animation: pulse 2s infinite;
         }
 
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
         .toast {
             position: fixed;
             bottom: 20px;
             right: 20px;
-            padding: var(--space-md) var(--space-lg);
+            padding: 1rem 1.5rem;
             background: var(--card-bg);
             border: 1px solid var(--neon-green);
-            border-radius: var(--radius-md);
+            border-radius: 10px;
             color: var(--text-primary);
             z-index: 1000;
             animation: slideIn 0.3s ease;
@@ -284,14 +352,19 @@
         }
 
         @keyframes slideIn {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
 
-            to {
-                transform: translateX(0);
-                opacity: 1;
+        .empty-message {
+            color: var(--text-muted);
+            text-align: center;
+            padding: 1rem;
+        }
+
+        @media (max-width: 1100px) {
+            .admin-grid {
+                grid-template-columns: repeat(2, 1fr);
             }
         }
 
@@ -299,7 +372,6 @@
             .admin-grid {
                 grid-template-columns: 1fr;
             }
-
             .status-grid {
                 grid-template-columns: 1fr;
             }
@@ -308,11 +380,9 @@
 </head>
 
 <body>
-    <!-- Animated Background -->
     <div class="bg-animation">
         <div class="stars"></div>
         <div class="stars2"></div>
-        <div class="stars3"></div>
     </div>
 
     <div class="screen active">
@@ -325,7 +395,7 @@
                         <span>Live updates</span>
                     </div>
                 </div>
-                <a href="/" class="btn btn-secondary">← Terug naar Game</a>
+                <a href="/" class="back-btn">← Terug naar Game</a>
             </header>
 
             <div class="admin-grid">
@@ -334,7 +404,7 @@
                     <h3>📊 Live Status</h3>
                     <div class="status-grid">
                         <div class="status-item">
-                            <span class="status-value" id="masterStatus">-</span>
+                            <span class="status-value offline" id="masterStatus">OFF</span>
                             <span class="status-label">Master</span>
                         </div>
                         <div class="status-item">
@@ -352,13 +422,11 @@
                     </div>
                 </div>
 
-                <!-- Connected Tiles -->
+                <!-- Tiles Status -->
                 <div class="admin-card">
                     <h3>🎯 Tiles Status</h3>
                     <div class="tile-grid-admin" id="tileGridAdmin">
-                        <p style="color: var(--text-muted); grid-column: 1/-1; text-align: center;">
-                            Geen tiles verbonden
-                        </p>
+                        <p class="empty-message">Geen tiles geregistreerd</p>
                     </div>
                 </div>
 
@@ -390,7 +458,7 @@
                             <span class="config-label">💀 Hard - Punten/ronde</span>
                             <input type="number" class="config-input" id="hardPoints" value="25" min="1" max="100">
                         </div>
-                        <button class="btn btn-success" onclick="saveConfig()">💾 Opslaan</button>
+                        <button class="save-btn" id="saveLevelConfig">💾 Opslaan</button>
                     </div>
                 </div>
 
@@ -406,41 +474,41 @@
                             <span class="config-label">Bonus per sec over</span>
                             <input type="number" class="config-input" id="speedRunBonus" value="2" min="1" max="10">
                         </div>
-                        <button class="btn btn-success" onclick="saveSpeedRunConfig()">💾 Opslaan</button>
+                        <button class="save-btn" id="saveSpeedRunConfig">💾 Opslaan</button>
                     </div>
                 </div>
 
                 <!-- Leaderboard Management -->
-                <div class="admin-card" style="grid-column: 1 / -1;">
+                <div class="admin-card full-width">
                     <h3>🏆 Leaderboard Beheer</h3>
                     <div class="leaderboard-actions">
-                        <button class="btn btn-secondary" onclick="refreshLeaderboard()">🔄 Refresh</button>
-                        <button class="btn btn-danger" onclick="clearLeaderboard()">🗑️ Wis Alles</button>
+                        <button class="refresh-btn" id="refreshLeaderboard">🔄 Refresh</button>
+                        <button class="danger-btn" id="clearLeaderboard">🗑️ Wis Alles</button>
                     </div>
-                    <table class="leaderboard-table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Team</th>
-                                <th>Score</th>
-                                <th>Level</th>
-                                <th>Rondes</th>
-                                <th>Datum</th>
-                                <th>Actie</th>
-                            </tr>
-                        </thead>
-                        <tbody id="leaderboardBody">
-                            <tr>
-                                <td colspan="7" style="text-align: center; color: var(--text-muted);">
-                                    Laden...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div style="overflow-x: auto;">
+                        <table class="leaderboard-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Team</th>
+                                    <th>Score</th>
+                                    <th>Level</th>
+                                    <th>Rondes</th>
+                                    <th>Datum</th>
+                                    <th>Actie</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leaderboardBody">
+                                <tr>
+                                    <td colspan="7" class="empty-message">Laden...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <!-- Activity Log -->
-                <div class="admin-card" style="grid-column: 1 / -1;">
+                <div class="admin-card full-width">
                     <h3>📜 Activiteiten Log</h3>
                     <div class="log-container" id="logContainer">
                         <div class="log-entry">
@@ -454,24 +522,24 @@
     </div>
 
     <script>
-        // Configuration state
-        let config = {
-            levels: {
-                easy: { steps: 4, points: 10 },
-                medium: { steps: 6, points: 15 },
-                hard: { steps: 8, points: 25 }
-            },
-            speedRun: {
-                timePerStep: 3,
-                bonusPerSecond: 2
-            }
-        };
+        // ============================================
+        // ADMIN DASHBOARD - CLEAN IMPLEMENTATION
+        // ============================================
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
+        // Store leaderboard data for delete operations
+        var leaderboardData = [];
+
+        // Initialize on DOM ready
+        document.addEventListener('DOMContentLoaded', function() {
             loadStatus();
             refreshLeaderboard();
             loadConfig();
+
+            // Set up event listeners
+            document.getElementById('saveLevelConfig').addEventListener('click', saveConfig);
+            document.getElementById('saveSpeedRunConfig').addEventListener('click', saveSpeedRunConfig);
+            document.getElementById('refreshLeaderboard').addEventListener('click', refreshLeaderboard);
+            document.getElementById('clearLeaderboard').addEventListener('click', clearLeaderboard);
 
             // Auto-refresh every 5 seconds
             setInterval(loadStatus, 5000);
@@ -482,20 +550,21 @@
         // Load live status
         async function loadStatus() {
             try {
-                const response = await fetch('/status');
-                const data = await response.json();
+                var response = await fetch('/status');
+                var data = await response.json();
 
-                // Update status display
-                document.getElementById('masterStatus').textContent = data.master_connected ? 'ON' : 'OFF';
-                document.getElementById('masterStatus').className = 'status-value ' + (data.master_connected ? 'online' : 'offline');
+                // Update master status
+                var masterEl = document.getElementById('masterStatus');
+                masterEl.textContent = data.master_connected ? 'ON' : 'OFF';
+                masterEl.className = 'status-value ' + (data.master_connected ? 'online' : 'offline');
 
+                // Update other stats
                 document.getElementById('tilesConnected').textContent = data.connected_tiles || data.tiles_connected || 0;
                 document.getElementById('frontendsConnected').textContent = data.frontends || 0;
                 document.getElementById('gamesPlayed').textContent = data.games_played || 0;
 
                 // Load tiles
                 await loadTiles();
-
             } catch (error) {
                 console.error('Failed to load status:', error);
             }
@@ -504,22 +573,21 @@
         // Load tiles status
         async function loadTiles() {
             try {
-                const response = await fetch('/api/admin/tiles');
-                const data = await response.json();
-
-                const grid = document.getElementById('tileGridAdmin');
+                var response = await fetch('/api/admin/tiles');
+                var data = await response.json();
+                var grid = document.getElementById('tileGridAdmin');
 
                 if (!data.tiles || data.tiles.length === 0) {
-                    grid.innerHTML = '<p style="color: var(--text-muted); grid-column: 1/-1; text-align: center;">Geen tiles geregistreerd</p>';
+                    grid.innerHTML = '<p class="empty-message">Geen tiles geregistreerd</p>';
                     return;
                 }
 
-                grid.innerHTML = data.tiles.map(tile => `
-                    <div class="tile-status ${tile.connected ? 'connected' : 'disconnected'}">
-                        ${tile.id}
-                    </div>
-                `).join('');
-
+                var html = '';
+                for (var i = 0; i < data.tiles.length; i++) {
+                    var tile = data.tiles[i];
+                    html += '<div class="tile-status ' + (tile.connected ? 'connected' : 'disconnected') + '">' + tile.id + '</div>';
+                }
+                grid.innerHTML = html;
             } catch (error) {
                 console.error('Failed to load tiles:', error);
             }
@@ -528,25 +596,22 @@
         // Load configuration
         async function loadConfig() {
             try {
-                const response = await fetch('/api/admin/config');
-                const data = await response.json();
+                var response = await fetch('/api/admin/config');
+                var data = await response.json();
 
                 if (data.levels) {
-                    config.levels = data.levels;
-
-                    document.getElementById('easySteps').value = data.levels.easy?.steps || 4;
-                    document.getElementById('easyPoints').value = data.levels.easy?.points || 10;
-                    document.getElementById('mediumSteps').value = data.levels.medium?.steps || 6;
-                    document.getElementById('mediumPoints').value = data.levels.medium?.points || 15;
-                    document.getElementById('hardSteps').value = data.levels.hard?.steps || 8;
-                    document.getElementById('hardPoints').value = data.levels.hard?.points || 25;
+                    document.getElementById('easySteps').value = (data.levels.easy && data.levels.easy.steps) || 4;
+                    document.getElementById('easyPoints').value = (data.levels.easy && data.levels.easy.points) || 10;
+                    document.getElementById('mediumSteps').value = (data.levels.medium && data.levels.medium.steps) || 6;
+                    document.getElementById('mediumPoints').value = (data.levels.medium && data.levels.medium.points) || 15;
+                    document.getElementById('hardSteps').value = (data.levels.hard && data.levels.hard.steps) || 8;
+                    document.getElementById('hardPoints').value = (data.levels.hard && data.levels.hard.points) || 25;
                 }
 
                 if (data.speedRun) {
                     document.getElementById('speedRunTime').value = data.speedRun.timePerStep || 3;
                     document.getElementById('speedRunBonus').value = data.speedRun.bonusPerSecond || 2;
                 }
-
             } catch (error) {
                 console.error('Failed to load config:', error);
             }
@@ -554,26 +619,26 @@
 
         // Save level configuration
         async function saveConfig() {
-            const newConfig = {
+            var config = {
                 easy: {
-                    steps: parseInt(document.getElementById('easySteps').value),
-                    points: parseInt(document.getElementById('easyPoints').value)
+                    steps: parseInt(document.getElementById('easySteps').value) || 4,
+                    points: parseInt(document.getElementById('easyPoints').value) || 10
                 },
                 medium: {
-                    steps: parseInt(document.getElementById('mediumSteps').value),
-                    points: parseInt(document.getElementById('mediumPoints').value)
+                    steps: parseInt(document.getElementById('mediumSteps').value) || 6,
+                    points: parseInt(document.getElementById('mediumPoints').value) || 15
                 },
                 hard: {
-                    steps: parseInt(document.getElementById('hardSteps').value),
-                    points: parseInt(document.getElementById('hardPoints').value)
+                    steps: parseInt(document.getElementById('hardSteps').value) || 8,
+                    points: parseInt(document.getElementById('hardPoints').value) || 25
                 }
             };
 
             try {
-                const response = await fetch('/api/admin/config/levels', {
+                var response = await fetch('/api/admin/config/levels', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(newConfig)
+                    body: JSON.stringify(config)
                 });
 
                 if (response.ok) {
@@ -584,21 +649,22 @@
                 }
             } catch (error) {
                 showToast('Fout bij opslaan', true);
+                console.error('Save config error:', error);
             }
         }
 
         // Save speed run configuration
         async function saveSpeedRunConfig() {
-            const newConfig = {
-                timePerStep: parseInt(document.getElementById('speedRunTime').value),
-                bonusPerSecond: parseInt(document.getElementById('speedRunBonus').value)
+            var config = {
+                timePerStep: parseInt(document.getElementById('speedRunTime').value) || 3,
+                bonusPerSecond: parseInt(document.getElementById('speedRunBonus').value) || 2
             };
 
             try {
-                const response = await fetch('/api/admin/config/speedrun', {
+                var response = await fetch('/api/admin/config/speedrun', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(newConfig)
+                    body: JSON.stringify(config)
                 });
 
                 if (response.ok) {
@@ -609,41 +675,90 @@
                 }
             } catch (error) {
                 showToast('Fout bij opslaan', true);
+                console.error('Save speedrun error:', error);
             }
         }
 
         // Refresh leaderboard
         async function refreshLeaderboard() {
             try {
-                const response = await fetch('/api/leaderboard?limit=50');
-                const data = await response.json();
-
-                const tbody = document.getElementById('leaderboardBody');
+                var response = await fetch('/api/leaderboard?limit=50');
+                var data = await response.json();
+                var tbody = document.getElementById('leaderboardBody');
 
                 if (!data.leaderboard || data.leaderboard.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Geen scores</td></tr>';
+                    leaderboardData = [];
+                    tbody.innerHTML = '<tr><td colspan="7" class="empty-message">Geen scores</td></tr>';
                     return;
                 }
 
-                tbody.innerHTML = data.leaderboard.map((entry, index) => `
-                    <tr>
-                        <td>${index + 1}</td>
-                        <td>${escapeHtml(entry.team_name)}</td>
-                        <td>${entry.score}</td>
-                        <td>${entry.level}</td>
-                        <td>${entry.rounds}</td>
-                        <td>${formatDate(entry.created_at)}</td>
-                        <td>
-                            <button class="delete-btn" onclick="deleteScore('${entry.id || index}', '${escapeHtml(entry.team_name)}')">
-                                🗑️
-                            </button>
-                        </td>
-                    </tr>
-                `).join('');
+                // Store data for delete operations
+                leaderboardData = data.leaderboard;
 
+                // Clear table
+                tbody.innerHTML = '';
+                
+                // Build rows using DOM methods (safer than innerHTML with user data)
+                for (var i = 0; i < data.leaderboard.length; i++) {
+                    var entry = data.leaderboard[i];
+                    var tr = document.createElement('tr');
+                    
+                    // Rank
+                    var tdRank = document.createElement('td');
+                    tdRank.textContent = i + 1;
+                    tr.appendChild(tdRank);
+
+                    // Team name
+                    var tdTeam = document.createElement('td');
+                    tdTeam.textContent = entry.team_name;
+                    tr.appendChild(tdTeam);
+
+                    // Score
+                    var tdScore = document.createElement('td');
+                    tdScore.textContent = entry.score;
+                    tr.appendChild(tdScore);
+
+                    // Level
+                    var tdLevel = document.createElement('td');
+                    tdLevel.textContent = entry.level;
+                    tr.appendChild(tdLevel);
+
+                    // Rounds
+                    var tdRounds = document.createElement('td');
+                    tdRounds.textContent = entry.rounds;
+                    tr.appendChild(tdRounds);
+
+                    // Date
+                    var tdDate = document.createElement('td');
+                    tdDate.textContent = formatDate(entry.created_at);
+                    tr.appendChild(tdDate);
+
+                    // Delete button
+                    var tdAction = document.createElement('td');
+                    var deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'delete-btn';
+                    deleteBtn.textContent = '🗑️';
+                    deleteBtn.setAttribute('data-id', entry.id || String(i));
+                    deleteBtn.setAttribute('data-name', entry.team_name);
+                    deleteBtn.addEventListener('click', handleDeleteClick);
+                    tdAction.appendChild(deleteBtn);
+                    tr.appendChild(tdAction);
+
+                    tbody.appendChild(tr);
+                }
+
+                addLog('Leaderboard geladen', 'info');
             } catch (error) {
                 console.error('Failed to load leaderboard:', error);
             }
+        }
+
+        // Handle delete button click
+        function handleDeleteClick(event) {
+            var btn = event.target;
+            var id = btn.getAttribute('data-id');
+            var name = btn.getAttribute('data-name');
+            deleteScore(id, name);
         }
 
         // Clear entire leaderboard
@@ -653,7 +768,7 @@
             }
 
             try {
-                const response = await fetch('/api/leaderboard', {
+                var response = await fetch('/api/leaderboard', {
                     method: 'DELETE'
                 });
 
@@ -661,34 +776,34 @@
                     showToast('Leaderboard gewist!');
                     addLog('Leaderboard volledig gewist', 'warning');
                     refreshLeaderboard();
+                } else {
+                    showToast('Fout bij wissen', true);
                 }
             } catch (error) {
                 showToast('Fout bij wissen', true);
+                console.error('Clear leaderboard error:', error);
             }
         }
 
         // Delete single score
         async function deleteScore(id, teamName) {
-            if (!confirm(`Score van "${teamName}" verwijderen?`)) {
+            if (!confirm('Score van "' + teamName + '" verwijderen?')) {
                 return;
             }
 
             try {
-                console.log(`Deleting score with ID: ${id}`);
-                const response = await fetch(`/api/admin/leaderboard/${id}`, {
+                var response = await fetch('/api/admin/leaderboard/' + encodeURIComponent(id), {
                     method: 'DELETE'
                 });
 
-                const data = await response.json();
-                console.log('Delete response:', data);
+                var data = await response.json();
 
                 if (response.ok || data.status === 'ok') {
                     showToast('Score verwijderd!');
-                    addLog(`Score verwijderd: ${teamName}`, 'warning');
+                    addLog('Score verwijderd: ' + teamName, 'warning');
                     refreshLeaderboard();
                 } else {
-                    showToast(`Fout: ${data.message || 'Onbekende fout'}`, true);
-                    console.error('Delete failed:', data);
+                    showToast('Fout: ' + (data.message || 'Onbekende fout'), true);
                 }
             } catch (error) {
                 showToast('Fout bij verwijderen', true);
@@ -697,16 +812,24 @@
         }
 
         // Add log entry
-        function addLog(message, type = 'info') {
-            const container = document.getElementById('logContainer');
-            const time = new Date().toLocaleTimeString();
+        function addLog(message, type) {
+            type = type || 'info';
+            var container = document.getElementById('logContainer');
+            var time = new Date().toLocaleTimeString();
 
-            const entry = document.createElement('div');
+            var entry = document.createElement('div');
             entry.className = 'log-entry';
-            entry.innerHTML = `
-                <span class="log-time">${time}</span>
-                <span class="log-message ${type}">${message}</span>
-            `;
+
+            var timeSpan = document.createElement('span');
+            timeSpan.className = 'log-time';
+            timeSpan.textContent = time;
+
+            var msgSpan = document.createElement('span');
+            msgSpan.className = 'log-message ' + type;
+            msgSpan.textContent = message;
+
+            entry.appendChild(timeSpan);
+            entry.appendChild(msgSpan);
 
             container.insertBefore(entry, container.firstChild);
 
@@ -717,33 +840,31 @@
         }
 
         // Show toast notification
-        function showToast(message, isError = false) {
-            const toast = document.createElement('div');
+        function showToast(message, isError) {
+            var toast = document.createElement('div');
             toast.className = 'toast' + (isError ? ' error' : '');
             toast.textContent = message;
             document.body.appendChild(toast);
 
-            setTimeout(() => {
+            setTimeout(function() {
                 toast.remove();
             }, 3000);
         }
 
-        // Utility functions
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
+        // Format date
         function formatDate(dateStr) {
             if (!dateStr) return '-';
-            const date = new Date(dateStr);
-            return date.toLocaleDateString('nl-BE', {
-                day: '2-digit',
-                month: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
+            try {
+                var date = new Date(dateStr);
+                return date.toLocaleDateString('nl-BE', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch (e) {
+                return '-';
+            }
         }
     </script>
 </body>
