@@ -695,12 +695,31 @@ async def master_websocket(websocket: WebSocket):
             state.tiles[tid].connected = False
         state._last_tile_status = {}  # Force status broadcast
         logger.info("✗ All tiles marked offline (Master disconnected)")
+        
+        # Send master_disconnected event
+        await broadcast_to_frontends({
+            "event": "master_disconnected",
+            "data": {"connected": False}
+        })
+        
+        # Also send master_status for compatibility
         await broadcast_to_frontends({
             "event": "master_status",
             "data": {"connected": False}
         })
+        
         # Broadcast updated tile status showing all offline
-        await broadcast_tile_status(force=True)
+        await broadcast_to_frontends({
+            "event": "tile_status",
+            "data": {
+                "tiles": {tid: {"connected": False, "battery": info.battery} 
+                          for tid, info in state.tiles.items()},
+                "total": TOTAL_TILES,
+                "connected": 0,
+                "connected_tiles": [],
+                "master_connected": False
+            }
+        })
 
 async def handle_master_message(msg: dict):
     """Handle messages from master ESP"""

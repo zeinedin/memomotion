@@ -285,12 +285,21 @@ function handleMessage(msg) {
     case 'master_status':
     case 'master_connected':
       gameState.masterConnected = data.connected !== false;
+      // If master disconnected, clear all tiles
+      if (!gameState.masterConnected) {
+        gameState.connectedTiles = [];
+        console.log('Master disconnected - clearing all tiles');
+      }
       updateConnectionUI();
+      updateTileGrid();
       break;
 
     case 'master_disconnected':
       gameState.masterConnected = false;
+      gameState.connectedTiles = [];
+      console.log('Master disconnected event - clearing all tiles');
       updateConnectionUI();
+      updateTileGrid();
       break;
 
     case 'tile_status':
