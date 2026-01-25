@@ -380,20 +380,21 @@ void handleButton() {
         if (now - lastButtonPress > BUTTON_DEBOUNCE_MS) {
             Serial.println("🔘 START button pressed");
             
-            // 1. CONDITIONAL HARDWARE BROADCAST
-            // Only force LEDs off if we are in an active game phase
+            // 1. ALWAYS NOTIFY BACKEND FIRST
+            // Let backend handle game logic and send clear command back
+            if (wsConnected) {
+                wsSendJson("start_button_pressed", "{}");
+            } else {
+                Serial.println("⚠️ WebSocket not connected");
+            }
+            
+            // 2. IMMEDIATE LOCAL CLEAR if game is active
+            // This provides instant feedback while backend processes
             if (gameActive) {
                 Serial.println("📡 Game Active: Clearing Tiles...");
                 turnAllTilesOff();
             } else {
                 Serial.println("ℹ️ Game Idle: Skipping LED clear");
-            }
-            
-            // 2. ALWAYS NOTIFY BACKEND
-            if (wsConnected) {
-                wsSendJson("start_button_pressed", "{}");
-            } else {
-                Serial.println("⚠️ WebSocket not connected");
             }
             
             lastButtonPress = now;
