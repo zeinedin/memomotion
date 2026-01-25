@@ -1,82 +1,60 @@
 """
-Memory XXL Backend - TESTING VERSION
-January 15, 2026
-
-Features:
-- Team registration with levels
-- Leaderboard with Azure Cosmos DB
-- Visual tile pattern display
+Memory XXL Backend - ROBUST VERSION
+Production-ready with proper state machine and error handling
 """
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
+from enum import Enum
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Set
 import json
 import asyncio
 from datetime import datetime
-from typing import Dict, List, Optional
 import random
 import os
 import uuid
+import logging
 
-# Load environment variables from .env file
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Load environment variables
 from dotenv import load_dotenv
 load_dotenv()
 
-# Azure Cosmos DB imports
-from azure.cosmos import CosmosClient, PartitionKey, exceptions
+app = FastAPI(title="Memory XXL Backend - Robust")
 
-app = FastAPI(title="Memory XXL Backend")
+# ==================== ENUMS & CONSTANTS ====================
+class GamePhase(str, Enum):
+    IDLE = "idle"
+    REGISTERED = "registered"  # Team registered, waiting for start
+    SHOWING_PATTERN = "showing_pattern"
+    SELECTING = "selecting"
+    VALIDATING = "validating"
+    ROUND_COMPLETE = "round_complete"
+    GAME_OVER = "game_over"
 
-# ==================== COSMOS DB ====================
-# Configuration - Set these environment variables in .env file
-COSMOS_ENDPOINT = os.getenv("COSMOS_ENDPOINT", "https://your-account.documents.azure.com:443/")
-COSMOS_KEY = os.getenv("COSMOS_KEY", "your-primary-key-here")
-COSMOS_DATABASE = os.getenv("COSMOS_DATABASE", "memomotion")
-COSMOS_CONTAINER = os.getenv("COSMOS_CONTAINER", "leaderboard")
+class GameMode(str, Enum):
+    CLASSIC = "classic"
+    SPEEDRUN = "speedrun"
+    ENDLESS = "endless"
+    SIMON = "simon"
 
-# Global Cosmos DB clients
-cosmos_client = None
-database = None
-container = None
-cosmos_initialized = False
+# Level configurations
+LEVEL_CONFIG = {
+    "easy": {"base_pattern": 3, "multiplier": 1, "base_points": 20, "show_time": 5},
+    "medium": {"base_pattern": 4, "multiplier": 2, "base_points": 30, "show_time": 6},
+    "hard": {"base_pattern": 5, "multiplier": 3, "base_points": 50, "show_time": 8}
+}
 
-def init_cosmos_db():
-    """Initialize Cosmos DB connection"""
-    global cosmos_client, database, container, cosmos_initialized
-    
-    try:
-        # Check if credentials are set
-        if "your-account" in COSMOS_ENDPOINT or "your-primary-key" in COSMOS_KEY:
-            print("⚠️ Cosmos DB credentials not configured - set COSMOS_ENDPOINT and COSMOS_KEY environment variables")
-            return False
-        
-        # Create the Cosmos client
-        cosmos_client = CosmosClient(COSMOS_ENDPOINT, COSMOS_KEY)
-        
-        # Get database reference (assumes database exists)
-        database = cosmos_client.get_database_client(COSMOS_DATABASE)
-        
-        # Get container reference (assumes container exists)
-        container = database.get_container_client(COSMOS_CONTAINER)
-        
-        # Test connection by reading container properties
-        container.read()
-        
-        cosmos_initialized = True
-        print("✓ Cosmos DB connected successfully")
-        print(f"  Database: {COSMOS_DATABASE}")
-        print(f"  Container: {COSMOS_CONTAINER}")
-        return True
-        
-    except exceptions.CosmosHttpResponseError as e:
-        print(f"✗ Cosmos DB connection failed: {e.message}")
-        return False
-    except Exception as e:
-        print(f"✗ Cosmos DB error: {e}")
-        return False
+WRONG_PENALTY = 15
+TOTAL_TILES = 12  # Expected total tiles
+STATUS_BROADCAST_INTERVAL = 3.0  # Seconds between status broadcasts (reduced from 0.5)
 
 # ==================== MODELS ====================
 class ScoreEntry(BaseModel):
@@ -85,9 +63,63 @@ class ScoreEntry(BaseModel):
     level: str
     rounds: int = 0
 
+@dataclass
+class TileInfo:
+    id: int
+    connected: bool = False
+    last_seen: float = 0
+    battery: int = 100
 
+@dataclass
+class GameSession:
+    team_name: str = ""
+    level: str = "easy"
+    mode: GameMode = GameMode.CLASSIC
+    phase: GamePhase = GamePhase.IDLE
+    score: int = 0
+    round_number: int = 0
+    pattern: List[int] = field(default_factory=list)
+    player_sequence: List[int] = field(default_factory=list)  # For Simon Says order tracking
+    selected_tiles: Set[int] = field(default_factory=set)
+    score_submitted: bool = False
+    phase_start_time: float = 0
+    
+    def reset(self):
+        self.team_name = ""
+        self.level = "easy"
+        self.mode = GameMode.CLASSIC
+        self.phase = GamePhase.IDLE
+        self.score = 0
+        self.round_number = 0
+        self.pattern = []
+        self.player_sequence = []
+        self.selected_tiles = set()
+        self.score_submitted = False
+        self.phase_start_time = 0
 
-# CORS
+# ==================== GLOBAL STATE ====================
+class AppState:
+    def __init__(self):
+        self.master_ws: Optional[WebSocket] = None
+        self.master_id: Optional[str] = None
+        self.frontend_connections: List[WebSocket] = []
+        self.tiles: Dict[int, TileInfo] = {}
+        self.game: GameSession = GameSession()
+        self.games_played: int = 0
+        self.high_score: int = 0
+        self._status_task: Optional[asyncio.Task] = None
+        self._last_tile_status: Dict = {}  # Track last sent status to avoid spam
+        
+    def get_connected_tiles(self) -> List[int]:
+        """Get list of connected tile IDs"""
+        return [tid for tid, info in self.tiles.items() if info.connected]
+    
+    def get_connected_count(self) -> int:
+        return len(self.get_connected_tiles())
+
+state = AppState()
+
+# ==================== CORS & STATIC FILES ====================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -96,325 +128,473 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/assets", StaticFiles(directory="static"), name="static")
+# Mount static files if directory exists
+if os.path.exists("static"):
+    app.mount("/assets", StaticFiles(directory="static"), name="static")
 
+# ==================== COSMOS DB (Optional) ====================
+cosmos_initialized = False
+container = None
 
-# ==================== STATE ====================
-class GameState:
-    def __init__(self):
-        self.master_ws: Optional[WebSocket] = None
-        self.master_id: Optional[str] = None
-        self.frontend_connections: List[WebSocket] = []
+def init_cosmos_db():
+    """Initialize Cosmos DB connection - optional"""
+    global cosmos_initialized, container
+    try:
+        from azure.cosmos import CosmosClient, exceptions
         
-        self.tiles: Dict[int, dict] = {}  # tile_id -> {connected, battery}
+        endpoint = os.getenv("COSMOS_ENDPOINT", "")
+        key = os.getenv("COSMOS_KEY", "")
         
-        # Game states
-        self.game_phase: str = "idle"  # idle, showing_pattern, selecting, checking
-        self.pattern: List[int] = []
-        self.player_steps: List[int] = []  # For Simon Says - tracks sequence order
-        self.selected_tiles: set = set()  # Tiles currently selected by player (toggle mode)
+        if not endpoint or not key or "your-" in endpoint:
+            logger.info("Cosmos DB not configured - using in-memory storage")
+            return False
         
-        # Team info
-        self.current_team: str = ""
-        self.current_level: str = "easy"
-        self.current_mode: str = "classic"  # classic, speedrun, endless, simon
-        self.score_submitted: bool = False  # Prevent duplicate score submissions
-        
-        self.games_played = 0
-        self.high_score = 0
-        self.current_score = 0
-        self.round_number = 0
-        self.start_time = None
+        client = CosmosClient(endpoint, key)
+        database = client.get_database_client(os.getenv("COSMOS_DATABASE", "memomotion"))
+        container = database.get_container_client(os.getenv("COSMOS_CONTAINER", "leaderboard"))
+        container.read()
+        cosmos_initialized = True
+        logger.info("✓ Cosmos DB connected")
+        return True
+    except Exception as e:
+        logger.warning(f"Cosmos DB unavailable: {e}")
+        return False
 
-# Level configurations
-# Scoring: correct = round_number * level_multiplier * 10
-# Wrong = -15 penalty (but score cannot go below 0)
-LEVEL_CONFIG = {
-    "easy": {"pattern_length": 1, "level_multiplier": 1, "base_points": 20},
-    "medium": {"pattern_length": 3, "level_multiplier": 2, "base_points": 30},
-    "hard": {"pattern_length": 5, "level_multiplier": 3, "base_points": 50}
-}
+# In-memory leaderboard fallback
+in_memory_leaderboard: List[dict] = []
 
-WRONG_PENALTY = 15  # Points deducted for wrong answer
+# ==================== HELPER FUNCTIONS ====================
+async def broadcast_to_frontends(message: dict):
+    """Send message to all connected frontends"""
+    if not state.frontend_connections:
+        return
+    
+    dead = []
+    for ws in state.frontend_connections:
+        try:
+            await ws.send_json(message)
+        except Exception:
+            dead.append(ws)
+    
+    for ws in dead:
+        if ws in state.frontend_connections:
+            state.frontend_connections.remove(ws)
 
-state = GameState()
+async def send_to_master(message: dict):
+    """Send message to master ESP"""
+    if state.master_ws:
+        try:
+            await state.master_ws.send_json(message)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send to master: {e}")
+    return False
+
+def calculate_pattern_length() -> int:
+    """Calculate pattern length based on mode, level, and round"""
+    base = LEVEL_CONFIG[state.game.level]["base_pattern"]
+    
+    if state.game.mode == GameMode.SIMON:
+        # Simon Says: starts at 1, grows by 1 each round
+        return min(state.game.round_number, state.get_connected_count())
+    elif state.game.mode == GameMode.ENDLESS:
+        # Endless: starts at 2, grows each round
+        return min(1 + state.game.round_number, state.get_connected_count())
+    else:
+        # Classic/Speedrun: fixed based on level
+        return min(base, state.get_connected_count())
+
+def calculate_points(correct: bool) -> int:
+    """Calculate points for round"""
+    if not correct:
+        return -WRONG_PENALTY
+    
+    config = LEVEL_CONFIG[state.game.level]
+    # Points = (round * multiplier * 10) + base
+    return (state.game.round_number * config["multiplier"] * 10) + config["base_points"]
+
+async def broadcast_tile_status(force: bool = False):
+    """Broadcast tile status to frontends - with deduplication"""
+    connected = state.get_connected_tiles()
+    
+    status_data = {
+        "tiles": {tid: {"connected": info.connected, "battery": info.battery} 
+                  for tid, info in state.tiles.items()},
+        "total": TOTAL_TILES,
+        "connected": len(connected),
+        "connected_tiles": connected,
+        "master_connected": state.master_id is not None
+    }
+    
+    # Only send if changed or forced
+    if not force and status_data == state._last_tile_status:
+        return
+    
+    state._last_tile_status = status_data.copy()
+    
+    await broadcast_to_frontends({
+        "event": "tile_status",
+        "data": status_data
+    })
 
 # ==================== ROUTES ====================
-@app.get("/status")
-async def root():
-    """Health check"""
-    return {
-        "status": "online",
-        "version": "testing-jan9",
-        "master_connected": state.master_id is not None,
-        "master_id": state.master_id,
-        "frontends": len(state.frontend_connections),
-        "tiles": len(state.tiles),
-        "connected_tiles": sum(1 for t in state.tiles.values() if t.get("connected", False))
-    }
-@app.get('/')
+@app.get("/")
 async def read_index():
-    return FileResponse('static/index.html')
+    if os.path.exists("static/index.html"):
+        return FileResponse("static/index.html")
+    return {"message": "Memory XXL Backend Running", "status": "ok"}
 
 @app.get("/app.js")
 async def read_js():
-    return FileResponse('static/app.js')
+    return FileResponse("static/app.js")
 
 @app.get("/style.css")
 async def read_css():
-    return FileResponse('static/style.css')
+    return FileResponse("static/style.css")
 
 @app.get("/tilehub_styles.css")
 async def read_tilehub_css():
-    return FileResponse('static/tilehub_styles.css')
+    return FileResponse("static/tilehub_styles.css")
 
 @app.get("/favicon.ico")
 async def favicon():
-    """Return empty favicon to suppress 404 errors"""
-    from fastapi.responses import Response
-    return Response(status_code=204)  # No Content
+    return Response(status_code=204)
 
-@app.get("/api/stats")
-async def get_stats():
-    """Get game statistics"""
+@app.get("/status")
+async def get_status():
     return {
-        "games_played": state.games_played,
-        "high_score": state.high_score,
-        "tiles_connected": sum(1 for t in state.tiles.values() if t.get("connected")),
-        "master_connected": state.master_id is not None
+        "status": "online",
+        "version": "robust-v2",
+        "master_connected": state.master_id is not None,
+        "frontends": len(state.frontend_connections),
+        "tiles_connected": state.get_connected_count(),
+        "total_tiles": TOTAL_TILES,
+        "game_phase": state.game.phase.value,
+        "cosmos_db": cosmos_initialized
     }
 
-@app.get("/api/cosmos-status")
-async def get_cosmos_status():
-    """Debug endpoint to check Cosmos DB connection status"""
-    return {
-        "cosmos_initialized": cosmos_initialized,
-        "endpoint_configured": "your-account" not in COSMOS_ENDPOINT,
-        "key_configured": "your-primary-key" not in COSMOS_KEY,
-        "database": COSMOS_DATABASE,
-        "container": COSMOS_CONTAINER,
-        "endpoint_prefix": COSMOS_ENDPOINT[:50] + "..." if len(COSMOS_ENDPOINT) > 50 else COSMOS_ENDPOINT
-    }
+@app.get("/admin")
+async def admin_page():
+    if os.path.exists("static/admin.html"):
+        return FileResponse("static/admin.html")
+    return {"message": "Admin page not found"}
 
-# ==================== LEADERBOARD API (Cosmos DB) ====================
+# ==================== LEADERBOARD API ====================
 @app.get("/api/leaderboard")
 async def get_leaderboard(limit: int = 10, level: Optional[str] = None):
-    """Get leaderboard entries from Cosmos DB"""
-    if not cosmos_initialized:
-        print("⚠️ Leaderboard request but Cosmos DB not initialized!")
-        return {"leaderboard": [], "error": "Database not connected", "cosmos_initialized": False}
+    if cosmos_initialized and container:
+        try:
+            query = "SELECT * FROM c ORDER BY c.score DESC OFFSET 0 LIMIT @limit"
+            params = [{"name": "@limit", "value": limit}]
+            if level:
+                query = "SELECT * FROM c WHERE c.level = @level ORDER BY c.score DESC OFFSET 0 LIMIT @limit"
+                params.append({"name": "@level", "value": level})
+            
+            items = list(container.query_items(query=query, parameters=params, enable_cross_partition_query=True))
+            return {"leaderboard": items}
+        except Exception as e:
+            logger.error(f"Leaderboard query error: {e}")
     
-    try:
-        # Build query - order by score descending
-        if level:
-            query = f"SELECT * FROM c WHERE c.level = @level ORDER BY c.score DESC OFFSET 0 LIMIT {limit}"
-            parameters = [{"name": "@level", "value": level}]
-        else:
-            query = f"SELECT * FROM c ORDER BY c.score DESC OFFSET 0 LIMIT {limit}"
-            parameters = []
-        
-        print(f"📊 Querying leaderboard: {query}")
-        
-        # Execute query (cross-partition since we use /id as partition key)
-        items = list(container.query_items(
-            query=query,
-            parameters=parameters,
-            enable_cross_partition_query=True
-        ))
-        
-        print(f"📊 Found {len(items)} items")
-        
-        # Format response (remove Cosmos DB internal fields)
-        leaderboard = [
-            {
-                "id": item.get("id"),
-                "team_name": item.get("team_name"),
-                "score": item.get("score"),
-                "level": item.get("level"),
-                "rounds": item.get("rounds", 0),
-                "created_at": item.get("created_at")
-            }
-            for item in items
-        ]
-        
-        return {"leaderboard": leaderboard}
-        
-    except Exception as e:
-        print(f"✗ Error fetching leaderboard: {e}")
-        return {"leaderboard": [], "error": str(e)}
+    # Fallback to in-memory
+    filtered = in_memory_leaderboard if not level else [e for e in in_memory_leaderboard if e.get("level") == level]
+    sorted_lb = sorted(filtered, key=lambda x: x.get("score", 0), reverse=True)[:limit]
+    return {"leaderboard": sorted_lb}
 
 @app.get("/api/leaderboard/check-name")
 async def check_team_name(name: str):
-    """Check if a team name already exists in the leaderboard"""
-    if not cosmos_initialized:
-        return {"exists": False, "error": "Database not connected"}
+    name_lower = name.strip().lower()
     
-    try:
-        query = "SELECT VALUE COUNT(1) FROM c WHERE LOWER(c.team_name) = LOWER(@name)"
-        parameters = [{"name": "@name", "value": name.strip()}]
-        
-        result = list(container.query_items(
-            query=query,
-            parameters=parameters,
-            enable_cross_partition_query=True
-        ))
-        
-        count = result[0] if result else 0
-        return {"exists": count > 0}
-        
-    except Exception as e:
-        print(f"✗ Error checking team name: {e}")
-        return {"exists": False, "error": str(e)}
+    if cosmos_initialized and container:
+        try:
+            query = "SELECT VALUE COUNT(1) FROM c WHERE LOWER(c.team_name) = @name"
+            result = list(container.query_items(
+                query=query,
+                parameters=[{"name": "@name", "value": name_lower}],
+                enable_cross_partition_query=True
+            ))
+            return {"exists": result[0] > 0 if result else False}
+        except Exception:
+            pass
+    
+    # Fallback
+    exists = any(e.get("team_name", "").lower() == name_lower for e in in_memory_leaderboard)
+    return {"exists": exists}
 
 @app.post("/api/leaderboard")
 async def add_score(entry: ScoreEntry):
-    """Add a new score to Cosmos DB leaderboard"""
-    if not cosmos_initialized:
-        return {"status": "error", "message": "Database not connected"}
+    item = {
+        "id": str(uuid.uuid4()),
+        "team_name": entry.team_name,
+        "score": entry.score,
+        "level": entry.level,
+        "rounds": entry.rounds,
+        "created_at": datetime.utcnow().isoformat()
+    }
     
-    try:
-        # Create document with unique ID
-        item = {
-            "id": str(uuid.uuid4()),  # Unique ID (also partition key)
-            "team_name": entry.team_name,
-            "score": entry.score,
-            "level": entry.level,
-            "rounds": entry.rounds,
-            "created_at": datetime.utcnow().isoformat()
-        }
-        
-        # Insert into Cosmos DB
-        container.create_item(body=item)
-        
-        print(f"✓ Score saved to Cosmos DB: {entry.team_name} - {entry.score} ({entry.level})")
-        
-        return {"status": "ok", "message": "Score saved", "id": item["id"]}
-        
-    except exceptions.CosmosHttpResponseError as e:
-        print(f"✗ Cosmos DB error: {e.message}")
-        return {"status": "error", "message": e.message}
-    except Exception as e:
-        print(f"✗ Error saving score: {e}")
-        return {"status": "error", "message": str(e)}
+    if cosmos_initialized and container:
+        try:
+            container.create_item(body=item)
+            logger.info(f"✓ Score saved to Cosmos: {entry.team_name} - {entry.score}")
+            return {"status": "ok", "id": item["id"]}
+        except Exception as e:
+            logger.error(f"Cosmos save error: {e}")
+    
+    # Fallback
+    in_memory_leaderboard.append(item)
+    logger.info(f"✓ Score saved to memory: {entry.team_name} - {entry.score}")
+    return {"status": "ok", "id": item["id"]}
 
 @app.delete("/api/leaderboard")
 async def clear_leaderboard():
-    """Clear all leaderboard entries (admin) - Use with caution!"""
-    if not cosmos_initialized:
-        return {"status": "error", "message": "Database not connected"}
+    global in_memory_leaderboard
+    in_memory_leaderboard = []
+    return {"status": "ok", "message": "Leaderboard cleared"}
+
+# ==================== GAME LOGIC ====================
+async def start_new_round():
+    """Start a new round - generate and show pattern"""
+    connected = state.get_connected_tiles()
+    
+    if len(connected) < 2:
+        await broadcast_to_frontends({
+            "event": "error",
+            "data": {"message": "Need at least 2 connected tiles"}
+        })
+        return False
+    
+    state.game.round_number += 1
+    state.game.phase = GamePhase.SHOWING_PATTERN
+    state.game.player_sequence = []
+    state.game.selected_tiles = set()
+    state.game.phase_start_time = asyncio.get_event_loop().time()
+    
+    # Generate pattern
+    pattern_length = calculate_pattern_length()
+    state.game.pattern = random.sample(connected, min(pattern_length, len(connected)))
+    
+    logger.info(f"Round {state.game.round_number}: Pattern {state.game.pattern} (mode={state.game.mode.value})")
+    
+    # Determine display mode
+    display_mode = "sequential" if state.game.mode == GameMode.SIMON else "simultaneous"
+    show_time = LEVEL_CONFIG[state.game.level]["show_time"]
+    
+    # Tell frontends
+    await broadcast_to_frontends({
+        "event": "game_started",
+        "data": {
+            "phase": "showing_pattern",
+            "pattern": state.game.pattern,
+            "round": state.game.round_number,
+            "score": state.game.score,
+            "display_mode": display_mode,
+            "show_time": show_time,
+            "message": f"Ronde {state.game.round_number}"
+        }
+    })
+    
+    # Tell master to show pattern
+    await send_to_master({
+        "event": "show_pattern",
+        "data": {
+            "pattern": state.game.pattern,
+            "mode": display_mode,
+            "duration": show_time * 1000
+        }
+    })
+    
+    # Wait for pattern display time
+    await asyncio.sleep(show_time)
+    
+    # Enter selecting phase
+    await enter_selecting_phase()
+    return True
+
+async def enter_selecting_phase():
+    """Transition to selecting phase"""
+    state.game.phase = GamePhase.SELECTING
+    state.game.phase_start_time = asyncio.get_event_loop().time()
+    state.game.selected_tiles = set()
+    state.game.player_sequence = []
+    
+    # Tell master to hide pattern
+    await send_to_master({
+        "event": "hide_pattern",
+        "data": {}
+    })
+    
+    await broadcast_to_frontends({
+        "event": "selecting_phase",
+        "data": {
+            "pattern_length": len(state.game.pattern),
+            "mode": state.game.mode.value,
+            "message": "Selecteer de juiste tegels!" if state.game.mode != GameMode.SIMON 
+                       else "Herhaal de volgorde!"
+        }
+    })
+
+async def handle_tile_step(tile_id: int, is_on: bool):
+    """Handle player stepping on a tile"""
+    if state.game.phase != GamePhase.SELECTING:
+        logger.debug(f"Tile {tile_id} step ignored - wrong phase: {state.game.phase}")
+        return
+    
+    # Simon Says: track sequence, no deselection
+    if state.game.mode == GameMode.SIMON:
+        if is_on:
+            state.game.player_sequence.append(tile_id)
+            state.game.selected_tiles.add(tile_id)
+            
+            # Check if sequence matches so far
+            idx = len(state.game.player_sequence) - 1
+            if idx < len(state.game.pattern):
+                if state.game.player_sequence[idx] != state.game.pattern[idx]:
+                    # Wrong sequence - game over
+                    await end_game_wrong()
+                    return
+                
+                # Check if pattern complete
+                if len(state.game.player_sequence) == len(state.game.pattern):
+                    await validate_selection()
+                    return
+        # Simon Says doesn't allow deselection
+        return
+    
+    # Other modes: toggle selection
+    if is_on:
+        state.game.selected_tiles.add(tile_id)
+    else:
+        state.game.selected_tiles.discard(tile_id)
+    
+    await broadcast_to_frontends({
+        "event": "tile_toggled",
+        "data": {
+            "tile_id": tile_id,
+            "is_selected": is_on,
+            "selected_tiles": list(state.game.selected_tiles),
+            "total_selected": len(state.game.selected_tiles),
+            "expected_count": len(state.game.pattern)
+        }
+    })
+
+async def validate_selection():
+    """Validate player's tile selection"""
+    state.game.phase = GamePhase.VALIDATING
+    
+    pattern_set = set(state.game.pattern)
+    
+    # Check based on mode
+    if state.game.mode == GameMode.SIMON:
+        correct = state.game.player_sequence == state.game.pattern
+    else:
+        correct = state.game.selected_tiles == pattern_set
+    
+    if correct:
+        await handle_correct_pattern()
+    else:
+        await end_game_wrong()
+
+async def handle_correct_pattern():
+    """Handle correct pattern selection"""
+    state.game.phase = GamePhase.ROUND_COMPLETE
+    
+    points = calculate_points(True)
+    state.game.score += points
+    
+    if state.game.score > state.high_score:
+        state.high_score = state.game.score
+    
+    logger.info(f"✓ Correct! +{points} points. Total: {state.game.score}")
+    
+    # Tell master
+    await send_to_master({"event": "pattern_correct", "data": {}})
+    
+    await broadcast_to_frontends({
+        "event": "pattern_correct",
+        "data": {
+            "message": "🎉 Perfect!",
+            "score": state.game.score,
+            "round": state.game.round_number,
+            "points_earned": points
+        }
+    })
+    
+    # Brief pause then next round
+    await asyncio.sleep(2)
+    
+    # Turn off tiles
+    await send_to_master({"event": "clear_tiles", "data": {}})
+    
+    # Start next round automatically
+    await asyncio.sleep(1)
+    await start_new_round()
+
+async def end_game_wrong():
+    """End game due to wrong selection"""
+    state.game.phase = GamePhase.GAME_OVER
+    
+    # Apply penalty
+    state.game.score = max(0, state.game.score - WRONG_PENALTY)
+    state.games_played += 1
+    
+    logger.info(f"✗ Wrong! Final score: {state.game.score}")
+    
+    # Tell master
+    await send_to_master({"event": "game_over", "data": {}})
+    
+    # Save score
+    await save_score()
+    
+    await broadcast_to_frontends({
+        "event": "game_over",
+        "data": {
+            "message": "❌ Fout! Game Over",
+            "expected": state.game.pattern,
+            "selected_tiles": list(state.game.selected_tiles),
+            "player_sequence": state.game.player_sequence,
+            "final_score": state.game.score,
+            "rounds": state.game.round_number,
+            "team_name": state.game.team_name,
+            "level": state.game.level,
+            "penalty_applied": WRONG_PENALTY
+        }
+    })
+    
+    # Reset game state after delay
+    await asyncio.sleep(2)
+    state.game.phase = GamePhase.IDLE
+
+async def save_score():
+    """Save score to leaderboard"""
+    if state.game.score_submitted or not state.game.team_name.strip():
+        return
     
     try:
-        # Query all items
-        items = list(container.query_items(
-            query="SELECT c.id FROM c",
-            enable_cross_partition_query=True
+        await add_score(ScoreEntry(
+            team_name=state.game.team_name,
+            score=state.game.score,
+            level=state.game.level,
+            rounds=state.game.round_number
         ))
-        
-        deleted_count = 0
-        for item in items:
-            # Delete each item (partition key is the id)
-            container.delete_item(item=item["id"], partition_key=item["id"])
-            deleted_count += 1
-        
-        print(f"✓ Cleared {deleted_count} entries from leaderboard")
-        return {"status": "ok", "message": f"Cleared {deleted_count} entries"}
-        
+        state.game.score_submitted = True
     except Exception as e:
-        print(f"✗ Error clearing leaderboard: {e}")
-        return {"status": "error", "message": str(e)}
-
-# ==================== ADMIN ROUTES ====================
-@app.get("/admin")
-async def admin_page():
-    """Serve admin dashboard"""
-    return FileResponse('static/admin.html')
-
-@app.get("/api/admin/tiles")
-async def get_tiles_status():
-    """Get all tiles status for admin"""
-    tiles = [
-        {"id": tile_id, "connected": info.get("connected", False), "battery": info.get("battery", 0)}
-        for tile_id, info in state.tiles.items()
-    ]
-    return {"tiles": sorted(tiles, key=lambda x: x["id"])}
-
-@app.get("/api/admin/config")
-async def get_config():
-    """Get current game configuration"""
-    return {
-        "levels": {
-            "easy": {"steps": LEVEL_CONFIG["easy"]["pattern_length"], "multiplier": LEVEL_CONFIG["easy"]["level_multiplier"], "base": LEVEL_CONFIG["easy"]["base_points"]},
-            "medium": {"steps": LEVEL_CONFIG["medium"]["pattern_length"], "multiplier": LEVEL_CONFIG["medium"]["level_multiplier"], "base": LEVEL_CONFIG["medium"]["base_points"]},
-            "hard": {"steps": LEVEL_CONFIG["hard"]["pattern_length"], "multiplier": LEVEL_CONFIG["hard"]["level_multiplier"], "base": LEVEL_CONFIG["hard"]["base_points"]}
-        },
-        "wrongPenalty": WRONG_PENALTY,
-        "scoringFormula": "points = (round * level_multiplier * 10) + base_points"
-    }
-
-@app.post("/api/admin/config/levels")
-async def update_level_config(config: dict):
-    """Update level configuration"""
-    global LEVEL_CONFIG
-    
-    if "easy" in config:
-        LEVEL_CONFIG["easy"]["pattern_length"] = config["easy"].get("steps", 1)
-        LEVEL_CONFIG["easy"]["level_multiplier"] = config["easy"].get("multiplier", 1)
-        LEVEL_CONFIG["easy"]["base_points"] = config["easy"].get("base", 20)
-    if "medium" in config:
-        LEVEL_CONFIG["medium"]["pattern_length"] = config["medium"].get("steps", 3)
-        LEVEL_CONFIG["medium"]["level_multiplier"] = config["medium"].get("multiplier", 2)
-        LEVEL_CONFIG["medium"]["base_points"] = config["medium"].get("base", 30)
-    if "hard" in config:
-        LEVEL_CONFIG["hard"]["pattern_length"] = config["hard"].get("steps", 5)
-        LEVEL_CONFIG["hard"]["level_multiplier"] = config["hard"].get("multiplier", 3)
-        LEVEL_CONFIG["hard"]["base_points"] = config["hard"].get("base", 50)
-    
-    print(f"✓ Level config updated: {LEVEL_CONFIG}")
-    return {"status": "ok", "config": LEVEL_CONFIG}
-
-@app.post("/api/admin/config/speedrun")
-async def update_speedrun_config(config: dict):
-    """Update speed run configuration"""
-    # Store in state for now (could be persisted to DB)
-    state.speedrun_time_per_step = config.get("timePerStep", 3)
-    state.speedrun_bonus = config.get("bonusPerSecond", 2)
-    
-    print(f"✓ Speed run config updated: {config}")
-    return {"status": "ok"}
-
-@app.delete("/api/admin/leaderboard/{score_id}")
-async def delete_single_score(score_id: str):
-    """Delete a single score from leaderboard by ID"""
-    if not cosmos_initialized:
-        return {"status": "error", "message": "Database not connected"}
-    
-    try:
-        # In Cosmos DB with /id as partition key, the id is also the partition key
-        container.delete_item(item=score_id, partition_key=score_id)
-        print(f"✓ Score {score_id} deleted")
-        return {"status": "ok", "message": f"Score {score_id} deleted"}
-    except exceptions.CosmosResourceNotFoundError:
-        return {"status": "error", "message": "Score not found"}
-    except Exception as e:
-        print(f"✗ Error deleting score: {e}")
-        return {"status": "error", "message": str(e)}
+        logger.error(f"Failed to save score: {e}")
 
 # ==================== MASTER WEBSOCKET ====================
 @app.websocket("/ws/master")
 async def master_websocket(websocket: WebSocket):
     await websocket.accept()
-    print("→ Master connected")
+    logger.info("→ Master WebSocket connected")
     
     try:
-        # Wait for master identification
-        data = await websocket.receive_json()
+        # Wait for identification
+        data = await asyncio.wait_for(websocket.receive_json(), timeout=10)
         
         if data.get("event") == "master_connected":
             state.master_ws = websocket
-            state.master_id = data["data"]["master_id"]
-            print(f"✓ Master registered: {state.master_id}")
+            state.master_id = data.get("data", {}).get("master_id", "ESP32")
+            logger.info(f"✓ Master registered: {state.master_id}")
             
-            # Notify frontends with both events for compatibility
+            # Notify frontends
             await broadcast_to_frontends({
                 "event": "master_status",
                 "data": {"connected": True, "master_id": state.master_id}
@@ -424,140 +604,101 @@ async def master_websocket(websocket: WebSocket):
                 "data": {"master_id": state.master_id}
             })
             
-            # Main loop
+            # Main message loop
             while True:
-                msg = await websocket.receive_json()
-                await handle_master_message(msg)
-                
+                try:
+                    msg = await asyncio.wait_for(websocket.receive_json(), timeout=30)
+                    await handle_master_message(msg)
+                except asyncio.TimeoutError:
+                    # Send ping to keep alive
+                    try:
+                        await websocket.send_json({"event": "ping"})
+                    except:
+                        break
+                        
     except WebSocketDisconnect:
-        print("✗ Master disconnected")
+        logger.info("✗ Master disconnected")
+    except Exception as e:
+        logger.error(f"Master error: {e}")
+    finally:
         state.master_ws = None
         state.master_id = None
-        # Clear all tiles - they're no longer reachable
-        state.tiles.clear()
+        # Don't clear tiles immediately - they may reconnect
         await broadcast_to_frontends({
             "event": "master_status",
             "data": {"connected": False}
         })
-        # Notify frontend that all tiles and ESPs are now offline
-        await broadcast_to_frontends({
-            "event": "tile_status",
-            "data": {
-                "tiles": {},
-                "tile_esps": [],
-                "total": 0,
-                "connected": 0,
-                "connected_esps": 0,
-                "master_connected": False
-            }
-        })
-    except Exception as e:
-        print(f"Master error: {e}")
-        state.master_ws = None
-        state.master_id = None
-        # Clear all tiles on error too
-        state.tiles.clear()
 
 async def handle_master_message(msg: dict):
-    """Handle messages from master ESP32"""
-    event = msg.get("event")
+    """Handle messages from master ESP"""
+    event = msg.get("event", "")
     data = msg.get("data", {})
     
-    print(f"← Master: {event}")
-    
     if event == "tile_status":
-        # Update tile status - REPLACE entire tiles dict with what master reports
+        # Update tile registry
         tiles_data = data.get("tiles", [])
-        tile_esps_data = data.get("tile_esps", [])
-        print(f"  Received {len(tiles_data)} tiles from master")
+        registered_count = data.get("registered_count", 0)
         
-        # Clear old tile data and rebuild from master's report
-        new_tiles = {}
+        # Update tiles
         for tile in tiles_data:
-            tile_id = tile["id"]
-            new_tiles[tile_id] = {
-                "connected": tile["connected"],
-                "battery": tile.get("battery", 100)
-            }
-            print(f"    Tile {tile_id}: {'connected' if tile['connected'] else 'disconnected'}")
+            tid = tile.get("id")
+            if tid:
+                if tid not in state.tiles:
+                    state.tiles[tid] = TileInfo(id=tid)
+                state.tiles[tid].connected = tile.get("connected", True)
+                state.tiles[tid].last_seen = asyncio.get_event_loop().time()
+                state.tiles[tid].battery = tile.get("battery", 100)
         
-        # Replace state with new data
-        state.tiles = new_tiles
+        # Broadcast to frontends (with deduplication)
+        await broadcast_tile_status()
         
-        connected_count = sum(1 for t in state.tiles.values() if t["connected"])
-        connected_esps = sum(1 for esp in tile_esps_data if esp.get("connected", False))
-        print(f"  Total tiles: {len(state.tiles)}, Connected: {connected_count}, ESPs: {connected_esps}/{len(tile_esps_data)}")
-        
-        # Broadcast to frontends with ESP data and master status
-        await broadcast_to_frontends({
-            "event": "tile_status",
-            "data": {
-                "tiles": state.tiles,
-                "tile_esps": tile_esps_data,
-                "total": len(state.tiles),
-                "connected": connected_count,
-                "connected_esps": connected_esps,
-                "master_connected": state.master_id is not None
-            }
-        })
-    
     elif event == "start_button_pressed":
-        print("→ START button pressed!")
-        await handle_start_button()
-    
-    elif event == "confirm_button_pressed":
-        print("→ CONFIRM button pressed!")
-        await handle_confirm_button()
-    
-    elif event == "player_step":
-        await handle_tile_toggle(data)
-    
-    elif event == "tile_touched" or event == "tile_pressed":
-        # Tile was touched/pressed - handle as toggle in selecting phase
-        tile_id = data.get("tile_id")
-        print(f"  Tile {tile_id} touched!")
+        logger.info("→ START button pressed")
         
-        # If game is in selecting phase, handle as toggle
-        if state.game_phase == "selecting":
-            await handle_tile_toggle(data)
-        else:
-            # Just visual feedback outside of selecting phase
+        if state.game.phase == GamePhase.REGISTERED:
+            # Start first round
+            await start_new_round()
+        elif state.game.phase == GamePhase.SELECTING:
+            # Confirm selection
+            await validate_selection()
+        elif state.game.phase == GamePhase.IDLE:
             await broadcast_to_frontends({
-                "event": "tile_pressed",
-                "data": {
-                    "tile_id": tile_id,
-                    "timestamp": data.get("timestamp", 0)
-                }
+                "event": "info",
+                "data": {"message": "Register a team first!"}
             })
     
-    elif event == "pattern_shown":
-        print("✓ Pattern displayed on tiles")
-        # Pattern is now showing - tell frontend
-        await broadcast_to_frontends({
-            "event": "pattern_displayed",
-            "data": {
-                "message": "Now memorize the pattern!",
-                "pattern": state.pattern
-            }
-        })
+    elif event == "confirm_button_pressed":
+        if state.game.phase == GamePhase.SELECTING:
+            await validate_selection()
+    
+    elif event == "player_step":
+        tile_id = data.get("tile_id")
+        is_on = data.get("is_on", True)
+        if tile_id is not None:
+            await handle_tile_step(tile_id, is_on)
+    
+    elif event == "pong":
+        pass  # Keep-alive response
 
 # ==================== FRONTEND WEBSOCKET ====================
 @app.websocket("/ws/frontend")
 async def frontend_websocket(websocket: WebSocket):
     await websocket.accept()
     state.frontend_connections.append(websocket)
-    print(f"→ Frontend connected (Total: {len(state.frontend_connections)})")
+    logger.info(f"→ Frontend connected (total: {len(state.frontend_connections)})")
     
-    # Send initial state with current tile status
-    connected_tiles = [tid for tid, info in state.tiles.items() if info.get("connected", False)]
+    # Send initial state
     await websocket.send_json({
         "event": "initial_state",
         "data": {
             "master_connected": state.master_id is not None,
             "games_played": state.games_played,
             "high_score": state.high_score,
-            "tiles": state.tiles,
-            "connected_tiles": connected_tiles
+            "tiles": {tid: {"connected": info.connected, "battery": info.battery} 
+                      for tid, info in state.tiles.items()},
+            "connected_tiles": state.get_connected_tiles(),
+            "total_tiles": TOTAL_TILES,
+            "game_phase": state.game.phase.value
         }
     })
     
@@ -566,423 +707,93 @@ async def frontend_websocket(websocket: WebSocket):
             msg = await websocket.receive_json()
             await handle_frontend_message(msg, websocket)
     except WebSocketDisconnect:
-        state.frontend_connections.remove(websocket)
-        print(f"✗ Frontend disconnected (Remaining: {len(state.frontend_connections)})")
+        pass
     except Exception as e:
-        print(f"Frontend error: {e}")
+        logger.error(f"Frontend error: {e}")
+    finally:
         if websocket in state.frontend_connections:
             state.frontend_connections.remove(websocket)
+        logger.info(f"✗ Frontend disconnected (remaining: {len(state.frontend_connections)})")
 
 async def handle_frontend_message(msg: dict, websocket: WebSocket):
     """Handle messages from frontend"""
-    # Handle both 'event' and 'type' formats from frontend
-    event = msg.get("event") or msg.get("type")
-    data = msg.get("data", {})
+    event = msg.get("event") or msg.get("type", "")
+    data = msg.get("data", {}) or msg
     
-    # If data is empty, use the message itself (flat format from frontend)
-    if not data:
-        data = msg
+    if event == "start_game":
+        # Register new game
+        state.game.reset()
+        state.game.team_name = data.get("team_name", "Team")
+        state.game.level = data.get("level", "easy")
+        
+        mode_str = data.get("mode", "classic")
+        try:
+            state.game.mode = GameMode(mode_str)
+        except ValueError:
+            state.game.mode = GameMode.CLASSIC
+        
+        state.game.phase = GamePhase.REGISTERED
+        
+        logger.info(f"→ Game registered: {state.game.team_name} ({state.game.level}, {state.game.mode.value})")
+        
+        await websocket.send_json({
+            "event": "game_registered",
+            "data": {
+                "team_name": state.game.team_name,
+                "level": state.game.level,
+                "mode": state.game.mode.value,
+                "message": "Press START on the master to begin!"
+            }
+        })
     
-    if event == "request_state":
-        # Send current state
+    elif event == "request_state":
         await websocket.send_json({
             "event": "state_update",
             "data": {
                 "master_connected": state.master_id is not None,
-                "tiles": state.tiles,
-                "game_phase": state.game_phase
-            }
-        })
-    
-    elif event == "start_game":
-        # Register team and level (handle both nested and flat formats)
-        state.current_team = data.get("team_name", msg.get("team_name", "Team"))
-        state.current_level = data.get("level", msg.get("level", "easy"))
-        state.current_mode = data.get("mode", msg.get("mode", "classic"))  # Get game mode
-        state.current_score = 0
-        state.round_number = 0
-        state.game_phase = "idle"
-        state.player_steps = []
-        state.pattern = []
-        state.score_submitted = False  # Reset for new game
-        print(f"→ New game registered: {state.current_team} ({state.current_level}) - Mode: {state.current_mode}")
-        
-        # Send confirmation to frontend
-        await websocket.send_json({
-            "event": "game_registered",
-            "data": {
-                "team_name": state.current_team,
-                "level": state.current_level,
-                "message": "Press START on the master to begin!"
+                "tiles": {tid: {"connected": info.connected} for tid, info in state.tiles.items()},
+                "game_phase": state.game.phase.value
             }
         })
 
-# ==================== GAME LOGIC ====================
-async def handle_start_button():
-    """Handle START button press - starts a new round"""
-    if not state.master_ws:
-        print("✗ No master connected")
-        return
-    
-    connected_tiles = [tid for tid, info in state.tiles.items() if info["connected"]]
-    if len(connected_tiles) < 2:
-        print("✗ Need at least 2 tiles")
-        await broadcast_to_frontends({
-            "event": "error",
-            "data": {"message": "Need at least 2 connected tiles"}
-        })
-        return
-    
-    if state.game_phase == "idle":
-        # Start a new round - show pattern
-        await start_show_pattern(connected_tiles)
-    elif state.game_phase == "selecting":
-        # START button during selecting phase = CONFIRM selection
-        print("  START pressed during selecting - treating as CONFIRM")
-        await handle_confirm_button()
-    else:
-        # In any other phase, ignore
-        print(f"  START pressed during {state.game_phase} - ignoring")
+# ==================== ADMIN API ====================
+@app.get("/api/admin/tiles")
+async def get_tiles_admin():
+    return {
+        "tiles": [
+            {"id": tid, "connected": info.connected, "battery": info.battery}
+            for tid, info in sorted(state.tiles.items())
+        ]
+    }
 
-async def start_show_pattern(connected_tiles: List[int]):
-    """Generate and show pattern - all tiles at once for 8 seconds"""
-    print("→ Showing pattern...")
-    
-    state.game_phase = "showing_pattern"
-    state.player_steps = []
-    state.selected_tiles = set()  # Clear selected tiles
-    state.round_number += 1
-    
-    # Calculate pattern length based on game mode
-    if state.current_mode == "simon":
-        # Simon Says: starts with 1, grows by 1 each round
-        pattern_length = state.round_number
-    elif state.current_mode == "endless":
-        # Endless: starts with 2, grows by 1 each round
-        pattern_length = 1 + state.round_number
-    else:
-        # Classic/Speedrun: use level config, no growth
-        level_config = LEVEL_CONFIG.get(state.current_level, LEVEL_CONFIG["easy"])
-        pattern_length = level_config["pattern_length"]
-    
-    # Cap at number of connected tiles
-    pattern_length = min(pattern_length, len(connected_tiles))
-    
-    # Generate pattern (unique tiles)
-    state.pattern = random.sample(connected_tiles, pattern_length)
-    
-    print(f"  Pattern: {state.pattern} (Mode: {state.current_mode}, Level: {state.current_level}, Round: {state.round_number}, Size: {pattern_length})")
-    
-    # Tell frontend - show all pattern tiles at once
-    await broadcast_to_frontends({
-        "event": "game_started",
-        "data": {
-            "phase": "showing_pattern",
-            "pattern": state.pattern,
-            "message": f"Ronde {state.round_number}",
-            "round": state.round_number,
-            "display_mode": "simultaneous"  # New flag for simultaneous display
-        }
-    })
-    
-    # Tell master to show ALL pattern tiles at once for 8 seconds
-    if state.master_ws:
-        await state.master_ws.send_json({
-            "event": "show_pattern_simultaneous",
-            "data": {
-                "pattern": state.pattern,
-                "duration": 8000  # 8 seconds in milliseconds
-            }
-        })
-    
-    # Wait 8 seconds for pattern display
-    await asyncio.sleep(8)
-    
-    # Enter selecting phase - player can now toggle tiles
-    state.game_phase = "selecting"
-    
-    # Turn off pattern tiles on master
-    if state.master_ws:
-        await state.master_ws.send_json({
-            "event": "pattern_hide",
-            "data": {}
-        })
-    
-    await broadcast_to_frontends({
-        "event": "selecting_phase",
-        "data": {
-            "pattern_length": len(state.pattern),
-            "message": "Selecteer de juiste tegels!"
-        }
-    })
+@app.get("/api/admin/config")
+async def get_config():
+    return {
+        "levels": LEVEL_CONFIG,
+        "wrongPenalty": WRONG_PENALTY,
+        "totalTiles": TOTAL_TILES
+    }
 
-async def handle_tile_toggle(data: dict):
-    """Player stepped on a tile - toggle selection on/off"""
-    tile_id = data.get("tile_id")
-    
-    if tile_id is None:
-        print("  Toggle ignored (no tile_id)")
-        return
-    
-    if state.game_phase != "selecting":
-        print(f"  Toggle ignored (wrong phase: {state.game_phase})")
-        return
-    
-    # Use LED state from tile if provided (more accurate), otherwise toggle
-    if "is_on" in data:
-        # Trust the tile's LED state (tile is authoritative)
-        is_selected = data.get("is_on", False)
-        
-        # For Simon Says, prevent deselection (sequence cannot be undone)
-        if state.current_mode == "simon" and not is_selected:
-            print(f"  ⛔ Simon Says: Ignoring deselection of tile {tile_id} - sequence is locked")
-            return
-        
-        if is_selected:
-            state.selected_tiles.add(tile_id)
-            # For Simon Says, track the sequence order
-            if state.current_mode == "simon":
-                state.player_steps.append(tile_id)
-                print(f"  Simon Says step {len(state.player_steps)}: Tile {tile_id}")
-        else:
-            state.selected_tiles.discard(tile_id)
-        print(f"  Tile {tile_id} {'SELECTED' if is_selected else 'DESELECTED'} (from tile, total: {len(state.selected_tiles)})")
-    else:
-        # Fallback: Toggle tile selection
-        if tile_id in state.selected_tiles:
-            # For Simon Says, prevent deselection
-            if state.current_mode == "simon":
-                print(f"  ⛔ Simon Says: Cannot deselect tile {tile_id} - sequence is locked")
-                return
-            state.selected_tiles.remove(tile_id)
-            is_selected = False
-            print(f"  Tile {tile_id} DESELECTED (total: {len(state.selected_tiles)})")
-        else:
-            state.selected_tiles.add(tile_id)
-            is_selected = True
-            # For Simon Says, track the sequence order
-            if state.current_mode == "simon":
-                state.player_steps.append(tile_id)
-                print(f"  Simon Says step {len(state.player_steps)}: Tile {tile_id}")
-            print(f"  Tile {tile_id} SELECTED (total: {len(state.selected_tiles)})")
-        
-        # Tell master to toggle LED on tile (only if we calculated the toggle)
-        if state.master_ws:
-            await state.master_ws.send_json({
-                "event": "toggle_tile",
-                "data": {
-                    "tile_id": tile_id,
-                    "on": is_selected
-                }
-            })
-    
-    # Broadcast to frontend
-    await broadcast_to_frontends({
-        "event": "tile_toggled",
-        "data": {
-            "tile_id": tile_id,
-            "is_selected": is_selected,
-            "selected_tiles": list(state.selected_tiles),
-            "total_selected": len(state.selected_tiles),
-            "expected_count": len(state.pattern)
-        }
-    })
-
-async def handle_confirm_button():
-    """Handle CONFIRM button press - validate selected tiles"""
-    if state.game_phase != "selecting":
-        print(f"  CONFIRM ignored (wrong phase: {state.game_phase})")
-        return
-    
-    print(f"→ Validating selection...")
-    print(f"  Selected: {sorted(state.selected_tiles)}")
-    print(f"  Pattern:  {sorted(state.pattern)}")
-    
-    state.game_phase = "checking"
-    
-    # For Simon Says, check sequence ORDER, not just the set
-    if state.current_mode == "simon":
-        print(f"  Simon Says sequence: {state.player_steps}")
-        print(f"  Expected pattern: {state.pattern}")
-        correct = state.player_steps == state.pattern
-        if not correct:
-            print(f"  ✗ WRONG ORDER! Player: {state.player_steps}, Expected: {state.pattern}")
-    else:
-        # For other modes, check if selected tiles match pattern (order doesn't matter)
-        pattern_set = set(state.pattern)
-        correct = state.selected_tiles == pattern_set
-    
-    # Get level config for scoring
-    level_config = LEVEL_CONFIG.get(state.current_level, LEVEL_CONFIG["easy"])
-    
-    if correct:
-        # Scoring: round_number * level_multiplier * 10 + base_points
-        # e.g., Round 1 Easy: 1 * 1 * 10 + 20 = 30 points
-        # e.g., Round 3 Hard: 3 * 3 * 10 + 50 = 140 points
-        points = (state.round_number * level_config["level_multiplier"] * 10) + level_config["base_points"]
-        state.current_score += points
-        if state.current_score > state.high_score:
-            state.high_score = state.current_score
-        
-        print(f"✓ CORRECT! Score: {state.current_score}")
-        
-        # Tell master to show success
-        if state.master_ws:
-            await state.master_ws.send_json({
-                "event": "pattern_correct",
-                "data": {}
-            })
-        
-        await broadcast_to_frontends({
-            "event": "pattern_correct",
-            "data": {
-                "message": "🎉 Perfect!",
-                "score": state.current_score,
-                "round": state.round_number,
-                "points_earned": points,
-                "pattern": state.pattern,
-                "selected_tiles": list(state.selected_tiles)
-            }
-        })
-        
-        # Wait then reset for next round
-        await asyncio.sleep(2)
-        
-        # Turn off all tiles
-        if state.master_ws:
-            await state.master_ws.send_json({
-                "event": "end_game",
-                "data": {}
-            })
-        
-        # Reset for next round (keep score and round number)
-        state.player_steps = []
-        state.pattern = []
-        state.selected_tiles = set()
-        
-        # Automatically start next round
-        connected_tiles = [tid for tid, info in state.tiles.items() if info["connected"]]
-        if len(connected_tiles) >= 2:
-            await asyncio.sleep(1)  # Brief pause before next round
-            await start_show_pattern(connected_tiles)
-        else:
-            state.game_phase = "idle"
-    else:
-        print(f"✗ WRONG SELECTION!")
-        print(f"  Missing: {pattern_set - state.selected_tiles}")
-        print(f"  Extra:   {state.selected_tiles - pattern_set}")
-        await end_game_wrong_selection()
-
-async def end_game_wrong_selection():
-    """End the game when player selects wrong tiles"""
-    print("→ Wrong selection - ending game...")
-    state.game_phase = "game_over"
-    
-    # Apply penalty (score can't go below 0)
-    state.current_score = max(0, state.current_score - WRONG_PENALTY)
-    
-    # Turn off all tiles
-    if state.master_ws:
-        await state.master_ws.send_json({
-            "event": "end_game",
-            "data": {}
-        })
-    
-    # Update stats
-    state.games_played += 1
-    
-    # Submit score to database from backend (only once)
-    await submit_score_to_db()
-    
-    # Send single game_over event with all data
-    await broadcast_to_frontends({
-        "event": "game_over",
-        "data": {
-            "message": "❌ Fout! Game Over",
-            "expected": state.pattern,
-            "selected_tiles": list(state.selected_tiles),
-            "final_score": state.current_score,
-            "rounds": state.round_number,
-            "team_name": state.current_team,
-            "level": state.current_level,
-            "penalty_applied": WRONG_PENALTY
-        }
-    })
-    
-    # Reset state
-    await asyncio.sleep(2)
-    state.game_phase = "idle"
-    state.player_steps = []
-    state.pattern = []
-    state.selected_tiles = set()
-
-# ==================== HELPERS ====================
-async def submit_score_to_db():
-    """Submit score to Cosmos DB - only once per game"""
-    if state.score_submitted:
-        print("  Score already submitted, skipping...")
-        return False
-    
-    if not state.current_team or not state.current_team.strip():
-        print("  No team name, skipping score submission...")
-        return False
-    
-    if not cosmos_initialized:
-        print("  Cosmos DB not initialized, skipping score submission...")
-        return False
-    
-    try:
-        item = {
-            "id": str(uuid.uuid4()),
-            "team_name": state.current_team.strip(),
-            "score": state.current_score,
-            "level": state.current_level,
-            "rounds": state.round_number,
-            "created_at": datetime.utcnow().isoformat()
-        }
-        
-        container.create_item(body=item)
-        state.score_submitted = True
-        print(f"✓ Score saved: {state.current_team} - {state.current_score} ({state.current_level})")
-        return True
-        
-    except Exception as e:
-        print(f"✗ Error saving score: {e}")
-        return False
-
-async def broadcast_to_frontends(message: dict):
-    """Send message to all connected frontends"""
-    dead_connections = []
-    for ws in state.frontend_connections:
-        try:
-            await ws.send_json(message)
-        except:
-            dead_connections.append(ws)
-    
-    # Remove dead connections
-    for ws in dead_connections:
-        if ws in state.frontend_connections:
-            state.frontend_connections.remove(ws)
+@app.post("/api/admin/reset")
+async def admin_reset():
+    """Reset game state"""
+    state.game.reset()
+    await send_to_master({"event": "reset", "data": {}})
+    await broadcast_to_frontends({"event": "game_reset", "data": {}})
+    return {"status": "ok"}
 
 # ==================== STARTUP ====================
 @app.on_event("startup")
 async def startup():
-    print("\n" + "="*50)
-    print("Memory XXL Backend - v2.1")
-    print("January 15, 2026 - Azure Cosmos DB Edition")
-    print("="*50)
+    logger.info("=" * 50)
+    logger.info("Memory XXL Backend - Robust v2")
+    logger.info("=" * 50)
     
-    # Initialize Cosmos DB
-    print("\n🔗 Connecting to Azure Cosmos DB...")
     init_cosmos_db()
     
-    print("\n✓ Server ready")
-    print(f"  Master endpoint: ws://YOUR_IP:8000/ws/master")
-    print(f"  Frontend endpoint: ws://YOUR_IP:8000/ws/frontend")
-    print(f"  Leaderboard API: http://YOUR_IP:8000/api/leaderboard")
-    print(f"  Health check: http://YOUR_IP:8000/status")
-    print("\nWaiting for connections...\n")
-    
+    logger.info("✓ Server ready")
+    logger.info(f"  Master: ws://HOST:8000/ws/master")
+    logger.info(f"  Frontend: ws://HOST:8000/ws/frontend")
 
 if __name__ == "__main__":
     import uvicorn

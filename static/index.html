@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Memory XXL - The Game</title>
     <link rel="stylesheet" href="/style.css">
-    <link rel="stylesheet" href="/tilehub_styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link
         href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@400;500;600;700&display=swap"
@@ -18,10 +17,9 @@
     <div class="bg-animation">
         <div class="stars"></div>
         <div class="stars2"></div>
-        <div class="stars3"></div>
     </div>
 
-    <!-- START SCREEN -->
+    <!-- ==================== START SCREEN ==================== -->
     <div id="startScreen" class="screen active">
         <div class="container">
             <header class="hero">
@@ -32,7 +30,7 @@
                 <p class="tagline">🧠 Test Your Memory • Beat The Challenge 🎮</p>
             </header>
 
-            <div class="card glass-card registration-card">
+            <div class="card glass-card">
                 <div class="card-header">
                     <span class="card-icon">👥</span>
                     <h2>Team Setup</h2>
@@ -40,124 +38,85 @@
 
                 <div class="form-group">
                     <label for="teamName">
-                        <span class="label-icon">🏷️</span> Team Naam
+                        <span class="label-icon">🏷️</span> Team Name
                     </label>
                     <div class="input-wrapper">
-                        <input type="text" id="teamName" placeholder="Enter your team name..." maxlength="20">
-                        <span class="input-focus-effect"></span>
+                        <input type="text" id="teamName" placeholder="Enter your team name..." maxlength="20"
+                            autocomplete="off">
                     </div>
                     <span id="teamNameError" class="input-error" style="display: none;"></span>
                 </div>
 
                 <div class="form-group">
-                    <label>
-                        <span class="label-icon">🎮</span> Game Mode
-                    </label>
+                    <label><span class="label-icon">🎮</span> Game Mode</label>
                     <div class="mode-selector">
                         <button class="mode-btn active" data-mode="classic">
-                            <div class="mode-glow"></div>
                             <span class="mode-icon">🧠</span>
                             <div class="mode-info">
                                 <span class="mode-name">CLASSIC</span>
-                                <span class="mode-desc">Herhaal het patroon</span>
-                            </div>
-                        </button>
-                        <button class="mode-btn" data-mode="speedrun">
-                            <div class="mode-glow"></div>
-                            <span class="mode-icon">⚡</span>
-                            <div class="mode-info">
-                                <span class="mode-name">SPEED RUN</span>
-                                <span class="mode-desc">Race tegen de klok</span>
-                            </div>
-                        </button>
-                        <button class="mode-btn" data-mode="endless">
-                            <div class="mode-glow"></div>
-                            <span class="mode-icon">♾️</span>
-                            <div class="mode-info">
-                                <span class="mode-name">ENDLESS</span>
-                                <span class="mode-desc">Groeiend patroon</span>
+                                <span class="mode-desc">Repeat the pattern</span>
                             </div>
                         </button>
                         <button class="mode-btn" data-mode="simon">
-                            <div class="mode-glow"></div>
                             <span class="mode-icon">🎯</span>
                             <div class="mode-info">
                                 <span class="mode-name">SIMON SAYS</span>
-                                <span class="mode-desc">Klassieke Simon Says</span>
+                                <span class="mode-desc">Exact sequence</span>
+                            </div>
+                        </button>
+                        <button class="mode-btn" data-mode="endless">
+                            <span class="mode-icon">♾️</span>
+                            <div class="mode-info">
+                                <span class="mode-name">ENDLESS</span>
+                                <span class="mode-desc">Growing pattern</span>
+                            </div>
+                        </button>
+                        <button class="mode-btn disabled" data-mode="speedrun" disabled>
+                            <span class="mode-icon">⚡</span>
+                            <div class="mode-info">
+                                <span class="mode-name">SPEED RUN</span>
+                                <span class="mode-desc">Coming soon</span>
                             </div>
                         </button>
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label>
-                        <span class="label-icon">⚡</span> Difficulty Level
-                    </label>
+                    <label><span class="label-icon">⚡</span> Difficulty</label>
                     <div class="level-selector">
                         <button class="level-btn active" data-level="easy">
-                            <div class="level-glow"></div>
                             <span class="level-icon">🌟</span>
                             <div class="level-info">
                                 <span class="level-name">EASY</span>
-                                <span class="level-desc">4 Steps</span>
+                                <span class="level-desc">3 Tiles</span>
                             </div>
                             <span class="level-multiplier">1x</span>
                         </button>
                         <button class="level-btn" data-level="medium">
-                            <div class="level-glow"></div>
                             <span class="level-icon">🔥</span>
                             <div class="level-info">
                                 <span class="level-name">MEDIUM</span>
-                                <span class="level-desc">6 Steps</span>
+                                <span class="level-desc">4 Tiles</span>
                             </div>
-                            <span class="level-multiplier">1.5x</span>
+                            <span class="level-multiplier">2x</span>
                         </button>
                         <button class="level-btn" data-level="hard">
-                            <div class="level-glow"></div>
                             <span class="level-icon">💀</span>
                             <div class="level-info">
                                 <span class="level-name">HARD</span>
-                                <span class="level-desc">8 Steps</span>
+                                <span class="level-desc">5 Tiles</span>
                             </div>
-                            <span class="level-multiplier">2.5x</span>
+                            <span class="level-multiplier">3x</span>
                         </button>
                     </div>
                 </div>
 
                 <button id="startGameBtn" class="btn btn-play">
-                    <span class="btn-bg"></span>
                     <span class="btn-text">🎮 START GAME</span>
                 </button>
             </div>
 
-            <!-- Tile Hub Registration Status -->
-            <div class="card glass-card registration-card">
-                <div class="card-header">
-                    <span class="card-icon">🔧</span>
-                    <h2>Tile Hub Status</h2>
-                </div>
-
-                <div class="registration-instructions">
-                    <strong>⚠️ Setup Required</strong><br>
-                    Step on each tile to register it before playing!
-                </div>
-
-                <div class="esp-grid" id="espGrid">
-                    <!-- Tile hub cards will be generated by JavaScript -->
-                </div>
-
-                <div class="registration-progress">
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progressFill" style="width: 0%;">0/12</div>
-                    </div>
-                </div>
-
-                <button class="reset-registration-btn" id="resetRegistrationBtn">
-                    🔄 Reset Registration
-                </button>
-            </div>
-
-            <div class="card glass-card leaderboard-card">
+            <div class="card glass-card">
                 <div class="card-header">
                     <span class="card-icon">🏆</span>
                     <h2>Leaderboard</h2>
@@ -165,17 +124,14 @@
                 <div id="leaderboardPreview" class="leaderboard-list">
                     <div class="loading-spinner">
                         <div class="spinner"></div>
-                        <span>Loading...</span>
                     </div>
                 </div>
-                <button id="viewLeaderboardBtn" class="btn btn-secondary">
-                    View All Rankings →
-                </button>
+                <button id="viewLeaderboardBtn" class="btn btn-secondary">View All →</button>
             </div>
         </div>
     </div>
 
-    <!-- GAME SCREEN -->
+    <!-- ==================== GAME SCREEN ==================== -->
     <div id="gameScreen" class="screen">
         <div class="container">
             <header class="game-header">
@@ -188,9 +144,7 @@
                         </span>
                     </div>
                 </div>
-                <button id="backToStartBtn" class="btn btn-icon">
-                    <span>✕</span>
-                </button>
+                <button id="backToStartBtn" class="btn btn-icon">✕</button>
             </header>
 
             <div class="game-stats">
@@ -208,63 +162,43 @@
                         <span class="stat-label">ROUND</span>
                     </div>
                 </div>
-                <div class="stat-box timer-box" id="timerDisplay" style="display: none;">
-                    <div class="stat-icon">⏱️</div>
-                    <div class="stat-content">
-                        <span class="stat-value" id="timerValue">0</span>
-                        <span class="stat-label">SECONDS</span>
-                    </div>
-                </div>
             </div>
 
             <div class="connection-status">
                 <div class="status-item">
                     <span class="status-indicator" id="masterDot"></span>
-                    <span id="masterStatus">Master: Connecting...</span>
+                    <span id="masterStatus">Master: Waiting...</span>
                 </div>
                 <div class="status-item">
                     <span class="status-indicator" id="tilesDot"></span>
-                    <span id="tilesStatus">Tiles: 0/0</span>
+                    <span id="tilesStatus">Tiles: 0/12</span>
                 </div>
             </div>
 
-            <div class="game-message-container" id="gameMessage">
+            <div class="game-message-container">
                 <div class="message-icon" id="messageIcon">🎮</div>
-                <div class="message-text" id="messageText">Press START button to begin!</div>
+                <div class="message-text" id="messageText">Press START to begin!</div>
             </div>
 
-            <!-- DYNAMIC TILE GRID - Generated by JS based on connected tiles -->
             <div class="card glass-card game-arena">
-                <h3 class="arena-title">
-                    <span class="arena-icon">🎯</span>
-                    Game Arena
-                </h3>
+                <h3 class="arena-title"><span class="arena-icon">🎯</span> Game Arena</h3>
                 <div class="tile-grid" id="tileGrid">
-                    <!-- Tiles will be dynamically generated -->
-                    <div class="no-tiles-message">
-                        <span class="no-tiles-icon">📡</span>
-                        <p>Waiting for tiles to connect...</p>
-                    </div>
+                    <!-- Tiles generated by JS -->
                 </div>
             </div>
 
-            <!-- PLAYER STEPS -->
             <div class="card glass-card steps-card" id="stepsSection">
-                <h3 class="section-title">
-                    <span class="section-icon">👟</span>
-                    Your Steps
-                </h3>
+                <h3 class="section-title"><span class="section-icon">👟</span> Your Selection</h3>
                 <div class="sequence-grid" id="stepsGrid"></div>
             </div>
         </div>
     </div>
 
-    <!-- LEADERBOARD SCREEN -->
+    <!-- ==================== LEADERBOARD SCREEN ==================== -->
     <div id="leaderboardScreen" class="screen">
         <div class="container">
             <header class="hero small">
                 <h1 class="page-title">🏆 HALL OF FAME</h1>
-                <p class="tagline">Top Memory Champions</p>
             </header>
 
             <div class="leaderboard-filters">
@@ -278,106 +212,55 @@
                 <div id="leaderboardFull" class="leaderboard-list full">
                     <div class="loading-spinner">
                         <div class="spinner"></div>
-                        <span>Loading...</span>
                     </div>
                 </div>
             </div>
 
-            <button id="backFromLeaderboardBtn" class="btn btn-primary">
-                ← Back to Menu
-            </button>
+            <button id="backFromLeaderboardBtn" class="btn btn-primary">← Back</button>
         </div>
     </div>
 
-    <!-- GAME OVER SCREEN -->
+    <!-- ==================== GAME OVER SCREEN ==================== -->
     <div id="gameOverScreen" class="screen">
         <div class="container">
             <div class="game-over-container">
-                <div class="game-over-effects">
-                    <div class="confetti"></div>
+                <h1 class="game-over-title" id="gameOverTitle">
+                    <span class="title-icon">🎮</span> GAME OVER
+                </h1>
+
+                <div class="score-display">
+                    <div class="score-ring">
+                        <div class="score-ring-inner">
+                            <span class="final-score" id="finalScore">0</span>
+                            <span class="score-label">POINTS</span>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="game-over-content">
-                    <h1 class="game-over-title" id="gameOverTitle">
-                        <span class="title-icon">🎮</span>
-                        GAME OVER
-                    </h1>
-
-                    <div class="score-display">
-                        <div class="score-ring">
-                            <div class="score-ring-inner">
-                                <span class="final-score" id="finalScore">0</span>
-                                <span class="score-label">POINTS</span>
-                            </div>
-                        </div>
+                <div class="final-stats">
+                    <div class="final-stat">
+                        <span class="final-stat-icon">🎯</span>
+                        <span class="final-stat-value" id="finalRounds">0</span>
+                        <span class="final-stat-label">Rounds</span>
                     </div>
-
-                    <div class="final-stats">
-                        <div class="final-stat">
-                            <span class="final-stat-icon">🎯</span>
-                            <span class="final-stat-value" id="finalRounds">0</span>
-                            <span class="final-stat-label">Rounds</span>
-                        </div>
-                        <div class="final-stat">
-                            <span class="final-stat-icon">⚡</span>
-                            <span class="final-stat-value" id="finalLevel">Easy</span>
-                            <span class="final-stat-label">Level</span>
-                        </div>
+                    <div class="final-stat">
+                        <span class="final-stat-icon">⚡</span>
+                        <span class="final-stat-value" id="finalLevel">Easy</span>
+                        <span class="final-stat-label">Level</span>
                     </div>
+                </div>
 
-                    <div class="game-over-actions">
-                        <button id="playAgainBtn" class="btn btn-play">
-                            <span class="btn-bg"></span>
-                            <span class="btn-text">🔄 PLAY AGAIN</span>
-                        </button>
-                        <button id="backToMenuBtn" class="btn btn-secondary">
-                            🏠 Main Menu
-                        </button>
-                    </div>
+                <div class="game-over-actions">
+                    <button id="playAgainBtn" class="btn btn-play">
+                        <span class="btn-text">🔄 PLAY AGAIN</span>
+                    </button>
+                    <button id="backToMenuBtn" class="btn btn-secondary">🏠 Main Menu</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <script>
-        // Ensure WebSocket connects properly on Azure (WSS for HTTPS)
-        console.log('Loading Memory XXL...');
-        console.log('Protocol:', window.location.protocol);
-        console.log('Host:', window.location.host);
-    </script>
     <script src="/app.js"></script>
-    <style>
-        .leaderboard-filters {
-            display: flex;
-            justify-content: center;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-            flex-wrap: wrap;
-        }
-
-        .filter-btn {
-            padding: 0.5rem 1rem;
-            border: 2px solid rgba(0, 245, 255, 0.3);
-            background: rgba(0, 245, 255, 0.1);
-            color: #fff;
-            border-radius: 20px;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 0.85rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .filter-btn:hover {
-            background: rgba(0, 245, 255, 0.2);
-            border-color: rgba(0, 245, 255, 0.5);
-        }
-
-        .filter-btn.active {
-            background: linear-gradient(135deg, rgba(0, 245, 255, 0.4), rgba(255, 0, 255, 0.4));
-            border-color: #00f5ff;
-            box-shadow: 0 0 15px rgba(0, 245, 255, 0.4);
-        }
-    </style>
 </body>
 
 </html>
