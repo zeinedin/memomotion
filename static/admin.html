@@ -796,19 +796,25 @@
             }
 
             try {
+                console.log('Clearing all leaderboard...');
                 var response = await fetch('/api/leaderboard', {
                     method: 'DELETE'
                 });
 
-                if (response.ok) {
-                    showToast('Leaderboard gewist!');
+                var data = await response.json();
+                console.log('Clear response:', data);
+
+                if (response.ok || data.status === 'ok') {
+                    showToast(data.message || 'Leaderboard gewist!');
                     addLog('Leaderboard volledig gewist', 'warning');
                     refreshLeaderboard();
                 } else {
-                    showToast('Fout bij wissen', true);
+                    showToast('Fout bij wissen: ' + (data.message || 'Onbekende fout'), true);
+                    addLog('Fout bij wissen leaderboard', 'error');
                 }
             } catch (error) {
                 showToast('Fout bij wissen', true);
+                addLog('Fout bij wissen: ' + error.message, 'error');
                 console.error('Clear leaderboard error:', error);
             }
         }
@@ -820,11 +826,13 @@
             }
 
             try {
+                console.log('Deleting score:', id, teamName);
                 var response = await fetch('/api/admin/leaderboard/' + encodeURIComponent(id), {
                     method: 'DELETE'
                 });
 
                 var data = await response.json();
+                console.log('Delete response:', data);
 
                 if (response.ok || data.status === 'ok') {
                     showToast('Score verwijderd!');
@@ -832,9 +840,11 @@
                     refreshLeaderboard();
                 } else {
                     showToast('Fout: ' + (data.message || 'Onbekende fout'), true);
+                    addLog('Fout bij verwijderen: ' + (data.message || 'Onbekende fout'), 'error');
                 }
             } catch (error) {
                 showToast('Fout bij verwijderen', true);
+                addLog('Fout bij verwijderen: ' + error.message, 'error');
                 console.error('Delete error:', error);
             }
         }

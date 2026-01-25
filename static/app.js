@@ -484,13 +484,13 @@ function updateConnectionUI() {
     elements.masterDot?.classList.add('connected');
     if (elements.masterStatus) {
       elements.masterStatus.textContent = gameState.masterConnected
-        ? 'Master: Connected ✓'
-        : 'Master: Active';
+        ? 'Hub: Connected ✓'
+        : 'Hub: Active';
     }
   } else {
     elements.masterDot?.classList.remove('connected');
     if (elements.masterStatus) {
-      elements.masterStatus.textContent = 'Master: Waiting...';
+      elements.masterStatus.textContent = 'Hub: Waiting...';
     }
   }
 
@@ -514,7 +514,7 @@ function updateConnectionUI() {
         `${connected}/${TOTAL_TILES} tiles online! Press START to begin!`,
       );
     } else if (!gameState.masterConnected) {
-      setMessage('📡', 'Waiting for Master ESP32...');
+      setMessage('📡', 'Waiting for Hub to connect...');
     } else {
       setMessage('📡', 'Waiting for tiles to connect...');
     }

@@ -354,9 +354,63 @@ async def add_score(entry: ScoreEntry):
 
 @app.delete("/api/leaderboard")
 async def clear_leaderboard():
+    """Clear entire leaderboard (both Cosmos DB and in-memory)"""
     global in_memory_leaderboard
+    
+    deleted_count = 0
+    failed_count = 0
+    
+    # Clear Cosmos DB if initialized
+    if cosmos_initialized and container:
+        try:
+            # Query all items with all fields needed for deletion
+            query = "SELECT * FROM c"
+            items = list(container.query_items(
+                query=query,
+                enable_cross_partition_query=True
+            ))
+            
+            logger.info(f"Found {len(items)} items in Cosmos DB to delete")
+            
+            for item in items:
+                item_id = item.get('id')
+                if not item_id:
+                    continue
+                    
+                # Try different partition key strategies
+                partition_keys_to_try = [
+                    item_id,  # Most common: /id as partition key
+                    item.get('team_name'),  # Alternative: /team_name
+                    item.get('level'),  # Alternative: /level
+                ]
+                
+                deleted = False
+                for pk in partition_keys_to_try:
+                    if pk is None:
+                        continue
+                    try:
+                        container.delete_item(item=item_id, partition_key=pk)
+                        deleted_count += 1
+                        deleted = True
+                        break
+                    except Exception:
+                        continue
+                
+                if not deleted:
+                    failed_count += 1
+                    logger.warning(f"Could not delete item {item_id}")
+            
+            logger.info(f"✓ Deleted {deleted_count} items from Cosmos DB ({failed_count} failed)")
+        except Exception as e:
+            logger.error(f"Failed to clear Cosmos DB: {e}")
+    
+    # Also clear in-memory
+    in_memory_count = len(in_memory_leaderboard)
     in_memory_leaderboard = []
-    return {"status": "ok", "message": "Leaderboard cleared"}
+    
+    total_deleted = deleted_count + in_memory_count
+    logger.info(f"✓ Leaderboard cleared (Cosmos: {deleted_count}, Memory: {in_memory_count})")
+    return {"status": "ok", "message": f"Leaderboard cleared ({total_deleted} scores deleted)"}
 
 # ==================== GAME LOGIC ====================
 async def start_new_round():
@@ -853,9 +907,11 @@ async def delete_single_score(score_id: str):
     """Delete a single score from leaderboard"""
     global in_memory_leaderboard
     
+    logger.info(f"Attempting to delete score with ID: {score_id}")
+    
     if cosmos_initialized and container:
         try:
-            # Try to find and delete from Cosmos DB
+            # Try to find the item first
             query = "SELECT * FROM c WHERE c.id = @id"
             items = list(container.query_items(
                 query=query,
@@ -865,37 +921,56 @@ async def delete_single_score(score_id: str):
             
             if items:
                 item = items[0]
-                container.delete_item(item=item['id'], partition_key=item.get('team_name', item['id']))
-                logger.info(f"✓ Deleted score {score_id} from Cosmos DB")
-                return {"status": "ok", "message": "Score deleted"}
+                item_id = item['id']
+                
+                # Try different partition key strategies
+                partition_keys_to_try = [
+                    item_id,  # Most common: /id as partition key
+                    item.get('team_name'),  # Alternative: /team_name
+                    item.get('level'),  # Alternative: /level
+                ]
+                
+                for pk in partition_keys_to_try:
+                    if pk is None:
+                        continue
+                    try:
+                        container.delete_item(item=item_id, partition_key=pk)
+                        logger.info(f"✓ Deleted score {score_id} from Cosmos DB (partition key: {pk})")
+                        return {"status": "ok", "message": "Score deleted"}
+                    except Exception as del_err:
+                        logger.debug(f"Delete with partition key '{pk}' failed: {del_err}")
+                        continue
+                
+                # If all partition key attempts failed, log error
+                logger.error(f"Could not delete item {score_id} - all partition key attempts failed")
+            else:
+                logger.info(f"Item {score_id} not found in Cosmos DB, trying in-memory")
         except Exception as e:
-            logger.error(f"Failed to delete from Cosmos DB: {e}")
-            # Fall through to try in-memory deletion
+            logger.error(f"Failed to query/delete from Cosmos DB: {e}")
     
     # Try in-memory deletion
     original_length = len(in_memory_leaderboard)
     
-    # Try to find by id (string) or by index (number)
-    try:
-        # First try as string id
-        in_memory_leaderboard = [e for e in in_memory_leaderboard if e.get("id") != score_id]
-        
-        # If that didn't work, try as index
-        if len(in_memory_leaderboard) == original_length:
-            try:
-                index = int(score_id)
-                if 0 <= index < len(in_memory_leaderboard):
-                    del in_memory_leaderboard[index]
-                    logger.info(f"✓ Deleted score at index {index} from memory")
-                    return {"status": "ok", "message": "Score deleted"}
-            except ValueError:
-                pass
-        else:
-            logger.info(f"✓ Deleted score {score_id} from memory")
-            return {"status": "ok", "message": "Score deleted"}
-    except Exception as e:
-        logger.error(f"Delete error: {e}")
+    # First try to find by id (UUID string)
+    new_leaderboard = [e for e in in_memory_leaderboard if e.get("id") != score_id]
     
+    if len(new_leaderboard) < original_length:
+        in_memory_leaderboard = new_leaderboard
+        logger.info(f"✓ Deleted score {score_id} from memory")
+        return {"status": "ok", "message": "Score deleted"}
+    
+    # If not found by ID, try as index
+    try:
+        index = int(score_id)
+        if 0 <= index < len(in_memory_leaderboard):
+            deleted_entry = in_memory_leaderboard[index]
+            del in_memory_leaderboard[index]
+            logger.info(f"✓ Deleted score at index {index} ({deleted_entry.get('team_name', 'unknown')}) from memory")
+            return {"status": "ok", "message": "Score deleted"}
+    except ValueError:
+        pass
+    
+    logger.warning(f"Score {score_id} not found in either Cosmos DB or memory")
     return {"status": "error", "message": "Score not found"}
 
 @app.post("/api/admin/reset")
