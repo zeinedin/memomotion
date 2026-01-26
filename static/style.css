@@ -817,6 +817,11 @@ body {
     pointer-events: none;
 }
 
+/* Hide tile numbers in Classic mode */
+.tile.hide-number .tile-number {
+    display: none;
+}
+
 .tile-offline-label {
     position: absolute;
     bottom: 6px;

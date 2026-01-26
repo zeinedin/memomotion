@@ -664,12 +664,15 @@ function buildTileGrid() {
   if (!elements.tileGrid) return;
 
   const connectedSet = new Set(gameState.connectedTiles);
+  // Hide tile numbers in Classic mode
+  const hideTileNumbers = gameState.mode === 'classic';
 
   elements.tileGrid.innerHTML = Array.from({ length: TOTAL_TILES }, (_, i) => {
     const tileId = i + 1;
     const isConnected = connectedSet.has(tileId);
     const classes = ['tile'];
     if (!isConnected) classes.push('offline');
+    if (hideTileNumbers) classes.push('hide-number');
 
     return `
             <div class="${classes.join(' ')}" data-tile-id="${tileId}" id="tile-${tileId}">
@@ -857,6 +860,9 @@ async function startGame() {
     level: gameState.level,
     mode: gameState.mode,
   });
+
+  // Rebuild tile grid with mode-specific settings (e.g., hide numbers for classic)
+  buildTileGrid();
 
   showScreen('game');
   setMessage('🎮', 'Press START on the master to begin!');

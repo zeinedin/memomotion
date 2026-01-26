@@ -71,11 +71,11 @@ class TileInfo:
     last_seen: float = 0
     battery: int = 100
 
-# Speedrun configuration
+# Speedrun configuration (time_limit in seconds: easy=4min, medium=2.5min, hard=1.5min)
 SPEEDRUN_CONFIG = {
-    "easy": {"time_limit": 60, "time_bonus_per_second": 5, "base_pattern": 2},
-    "medium": {"time_limit": 45, "time_bonus_per_second": 8, "base_pattern": 3},
-    "hard": {"time_limit": 30, "time_bonus_per_second": 12, "base_pattern": 4}
+    "easy": {"time_limit": 240, "time_bonus_per_second": 2, "base_pattern": 2},
+    "medium": {"time_limit": 150, "time_bonus_per_second": 3, "base_pattern": 3},
+    "hard": {"time_limit": 90, "time_bonus_per_second": 5, "base_pattern": 5}
 }
 
 @dataclass
@@ -293,6 +293,11 @@ async def speedrun_timer_loop():
             if state.game.phase == GamePhase.IDLE:
                 logger.info("⏱️ Timer stopped: game idle")
                 break
+            
+            # Check if speedrun was reset (start_time is 0)
+            if state.game.speedrun_start_time == 0:
+                logger.info("⏱️ Timer stopped: speedrun reset")
+                break
                 
             time_remaining = get_speedrun_time_remaining()
             
@@ -308,17 +313,26 @@ async def speedrun_timer_loop():
             # Check for timeout - END THE GAME
             if time_remaining <= 0:
                 logger.info("⏱️ Speedrun time's up! Ending game...")
+                # Call end_game_timeout and wait for it to complete
                 await end_game_timeout()
+                logger.info("⏱️ Timer loop exiting after timeout")
                 return  # Exit the loop completely
             
-            await asyncio.sleep(0.3)  # Update every 300ms for more responsive timer
+            await asyncio.sleep(0.5)  # Update every 500ms
     except asyncio.CancelledError:
         logger.info("⏱️ Timer cancelled")
     except Exception as e:
         logger.error(f"Speedrun timer error: {e}")
+        import traceback
+        traceback.print_exc()
 
 async def end_game_timeout():
     """End game due to Speedrun timeout"""
+    # Prevent multiple timeout calls
+    if state.game.phase == GamePhase.GAME_OVER:
+        logger.info("end_game_timeout: already game over, skipping")
+        return
+    
     state.game.phase = GamePhase.GAME_OVER
     state.games_played += 1
     
@@ -329,9 +343,15 @@ async def end_game_timeout():
         state.game.speedrun_timer_task.cancel()
         state.game.speedrun_timer_task = None
     
-    # Tell master to turn off all tiles
+    # Reset speedrun timing to prevent further checks
+    state.game.speedrun_start_time = 0
+    state.game.speedrun_time_limit = 0
+    
+    # Tell master to turn off all tiles (multiple times for reliability)
     await send_to_master({"event": "game_over", "data": {}})
-    await asyncio.sleep(0.2)
+    await asyncio.sleep(0.1)
+    await send_to_master({"event": "clear_tiles", "data": {}})
+    await asyncio.sleep(0.1)
     await send_to_master({"event": "clear_tiles", "data": {}})
     
     # Save score
@@ -345,13 +365,17 @@ async def end_game_timeout():
             "rounds": state.game.round_number,
             "team_name": state.game.team_name,
             "level": state.game.level,
-            "timeout": True
+            "timeout": True,
+            "mode": "speedrun"
         }
     })
     
-    # Reset game state after delay
-    await asyncio.sleep(2)
-    state.game.phase = GamePhase.IDLE
+    # Keep GAME_OVER phase visible longer before resetting
+    await asyncio.sleep(5)
+    
+    # Only reset to IDLE if still in GAME_OVER (not started new game)
+    if state.game.phase == GamePhase.GAME_OVER:
+        state.game.phase = GamePhase.IDLE
 
 async def broadcast_tile_status(force: bool = False):
     """Broadcast tile status to frontends - with deduplication"""
@@ -549,6 +573,17 @@ async def clear_leaderboard():
 # ==================== GAME LOGIC ====================
 async def start_new_round():
     """Start a new round - generate and show pattern"""
+    # Check if game was ended (e.g., by speedrun timeout)
+    if state.game.phase == GamePhase.GAME_OVER or state.game.phase == GamePhase.IDLE:
+        logger.info("start_new_round aborted - game already ended")
+        return False
+    
+    # For speedrun, check if time already expired
+    if state.game.mode == GameMode.SPEEDRUN and state.game.speedrun_start_time > 0:
+        if get_speedrun_time_remaining() <= 0:
+            logger.info("start_new_round aborted - speedrun time expired")
+            return False
+    
     connected = state.get_connected_tiles()
     
     if len(connected) < 2:
@@ -634,6 +669,17 @@ async def start_new_round():
 
 async def enter_selecting_phase():
     """Transition to selecting phase"""
+    # Check if game ended (speedrun timeout during pattern display)
+    if state.game.phase == GamePhase.GAME_OVER or state.game.phase == GamePhase.IDLE:
+        logger.info("enter_selecting_phase aborted - game already ended")
+        return
+    
+    # For speedrun, check if time expired
+    if state.game.mode == GameMode.SPEEDRUN and state.game.speedrun_start_time > 0:
+        if get_speedrun_time_remaining() <= 0:
+            logger.info("enter_selecting_phase aborted - speedrun time expired")
+            return
+    
     state.game.phase = GamePhase.SELECTING
     state.game.phase_start_time = asyncio.get_event_loop().time()
     state.game.selected_tiles = set()
@@ -660,6 +706,12 @@ async def handle_tile_step(tile_id: int, is_on: bool):
     if state.game.phase != GamePhase.SELECTING:
         logger.debug(f"Tile {tile_id} step ignored - wrong phase: {state.game.phase}")
         return
+    
+    # For speedrun, check if time expired (game should be ending)
+    if state.game.mode == GameMode.SPEEDRUN and state.game.speedrun_start_time > 0:
+        if get_speedrun_time_remaining() <= 0:
+            logger.debug(f"Tile {tile_id} step ignored - speedrun time expired")
+            return
     
     # Simon Says: track sequence, no deselection
     if state.game.mode == GameMode.SIMON:
@@ -701,6 +753,17 @@ async def handle_tile_step(tile_id: int, is_on: bool):
 
 async def validate_selection():
     """Validate player's tile selection"""
+    # Check if game already ended (e.g., speedrun timeout)
+    if state.game.phase == GamePhase.GAME_OVER or state.game.phase == GamePhase.IDLE:
+        logger.info("validate_selection aborted - game already ended")
+        return
+    
+    # For speedrun, check if time expired
+    if state.game.mode == GameMode.SPEEDRUN and state.game.speedrun_start_time > 0:
+        if get_speedrun_time_remaining() <= 0:
+            logger.info("validate_selection aborted - speedrun time expired")
+            return
+    
     state.game.phase = GamePhase.VALIDATING
     
     pattern_set = set(state.game.pattern)
@@ -744,6 +807,16 @@ async def handle_correct_pattern():
     # Brief pause then next round
     await asyncio.sleep(2)
     
+    # Check if game ended during the pause (speedrun timeout)
+    if state.game.phase == GamePhase.GAME_OVER or state.game.phase == GamePhase.IDLE:
+        logger.info("handle_correct_pattern: game ended during pause, not starting new round")
+        return
+    
+    # For speedrun, check if time expired during pause
+    if state.game.mode == GameMode.SPEEDRUN and get_speedrun_time_remaining() <= 0:
+        logger.info("handle_correct_pattern: speedrun time expired during pause")
+        return
+    
     # Ensure tiles are off before next round (send twice for reliability)
     await send_to_master({"event": "clear_tiles", "data": {}})
     await asyncio.sleep(0.2)
@@ -762,6 +835,10 @@ async def end_game_win():
     if state.game.speedrun_timer_task:
         state.game.speedrun_timer_task.cancel()
         state.game.speedrun_timer_task = None
+    
+    # Reset speedrun timing to prevent further checks
+    state.game.speedrun_start_time = 0
+    state.game.speedrun_time_limit = 0
     
     # Bonus points for winning!
     bonus_points = 100
@@ -799,12 +876,21 @@ async def end_game_win():
 
 async def end_game_wrong():
     """End game due to wrong selection"""
+    # Prevent multiple calls
+    if state.game.phase == GamePhase.GAME_OVER:
+        logger.info("end_game_wrong: already game over, skipping")
+        return
+    
     state.game.phase = GamePhase.GAME_OVER
     
     # Cancel speedrun timer if running
     if state.game.speedrun_timer_task:
         state.game.speedrun_timer_task.cancel()
         state.game.speedrun_timer_task = None
+    
+    # Reset speedrun timing to prevent further checks
+    state.game.speedrun_start_time = 0
+    state.game.speedrun_time_limit = 0
     
     # Apply penalty
     state.game.score = max(0, state.game.score - WRONG_PENALTY)
