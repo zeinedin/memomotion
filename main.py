@@ -302,37 +302,28 @@ async def speedrun_timer_loop():
             time_remaining = get_speedrun_time_remaining()
             
             # Broadcast timer update to frontends
-            await broadcast_to_frontends({
-                "event": "speedrun_timer",
-                "data": {
-                    "time_remaining": round(time_remaining, 1),
-                    "time_limit": state.game.speedrun_time_limit
-                }
-            })
+            try:
+                await broadcast_to_frontends({
+                    "event": "speedrun_timer",
+                    "data": {
+                        "time_remaining": round(time_remaining, 1),
+                        "time_limit": state.game.speedrun_time_limit
+                    }
+                })
+            except Exception as e:
+                logger.error(f"Timer broadcast error: {e}")
             
             # Check for timeout - END THE GAME
             if time_remaining <= 0:
                 logger.info("⏱️ Speedrun time's up! Ending game...")
-                # Call end_game_timeout and wait for it to complete
-                await end_game_timeout()
-                logger.info("⏱️ Timer loop exiting after timeout")
-                return  # Exit the loop completely
-            
-            await asyncio.sleep(0.5)  # Update every 500ms
-    except asyncio.CancelledError:
-        logger.info("⏱️ Timer cancelled")
-    except Exception as e:
-        logger.error(f"Speedrun timer error: {e}")
-        import traceback
-        traceback.print_exc()
-
-async def end_game_timeout():
-    """End game due to Speedrun timeout"""
-    # Prevent multiple timeout calls
-    if state.game.phase == GamePhase.GAME_OVER:
-        logger.info("end_game_timeout: already game over, skipping")
-        return
-    
+                try:
+                    # Call end_game_timeout and wait for it to complete
+                    await end_game_timeout()
+                    logger.info("⏱️ Timer loop exiting after timeout")
+                except Exception as e:
+                    logger.error(f"⏱️ Error in end_game_timeout: {e}")
+                    import traceback
+                    traceback.print_exc()
     state.game.phase = GamePhase.GAME_OVER
     state.games_played += 1
     
@@ -348,27 +339,37 @@ async def end_game_timeout():
     state.game.speedrun_time_limit = 0
     
     # Tell master to turn off all tiles (multiple times for reliability)
-    await send_to_master({"event": "game_over", "data": {}})
-    await asyncio.sleep(0.1)
-    await send_to_master({"event": "clear_tiles", "data": {}})
-    await asyncio.sleep(0.1)
-    await send_to_master({"event": "clear_tiles", "data": {}})
+    try:
+        await send_to_master({"event": "game_over", "data": {}})
+        await asyncio.sleep(0.1)
+        await send_to_master({"event": "clear_tiles", "data": {}})
+    except Exception as e:
+        logger.error(f"end_game_timeout: error sending to master: {e}")
     
-    # Save score
-    await save_score()
+    # Save score BEFORE broadcasting to prevent blocking
+    try:
+        await save_score()
+    except Exception as e:
+        logger.error(f"end_game_timeout: error saving score: {e}")
     
-    await broadcast_to_frontends({
-        "event": "game_over",
-        "data": {
-            "message": "⏱️ Time's Up! Game Over",
-            "final_score": state.game.score,
-            "rounds": state.game.round_number,
-            "team_name": state.game.team_name,
-            "level": state.game.level,
-            "timeout": True,
-            "mode": "speedrun"
-        }
-    })
+    # Broadcast game over to frontends - THIS IS CRITICAL
+    logger.info("end_game_timeout: Broadcasting game_over to frontends")
+    try:
+        await broadcast_to_frontends({
+            "event": "game_over",
+            "data": {
+                "message": "⏱️ Time's Up! Game Over",
+                "final_score": state.game.score,
+                "rounds": state.game.round_number,
+                "team_name": state.game.team_name,
+                "level": state.game.level,
+                "timeout": True,
+                "mode": "speedrun"
+            }
+        })
+        logger.info("end_game_timeout: game_over broadcast SENT")
+    except Exception as e:
+        logger.error(f"end_game_timeout: error broadcasting: {e}")
     
     # Keep GAME_OVER phase visible longer before resetting
     await asyncio.sleep(5)
