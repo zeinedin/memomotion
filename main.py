@@ -638,9 +638,10 @@ async def start_new_round():
     
     # Simon Says: build on previous pattern by adding one new tile each round
     if state.game.mode == GameMode.SIMON:
+        base = LEVEL_CONFIG[state.game.level]["base_pattern"]  # easy=1, medium=3, hard=5
         if state.game.round_number == 1:
-            # First round: start with 1 random tile
-            state.game.pattern = [random.choice(connected)]
+            # First round: start with base_pattern tiles based on difficulty
+            state.game.pattern = random.sample(connected, min(base, len(connected)))
         else:
             # Subsequent rounds: add one new random tile to existing pattern
             # Choose from tiles not recently used to add variety
