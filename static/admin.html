@@ -448,6 +448,19 @@
                             <span class="status-label">Games</span>
                         </div>
                     </div>
+                    <div class="status-item"
+                        style="margin-top: 1rem; background: rgba(0,0,0,0.2); padding: 0.75rem; border-radius: 8px;">
+                        <span class="status-label">Game Phase</span>
+                        <span class="status-value" id="gamePhase" style="font-size: 1rem;">-</span>
+                    </div>
+                </div>
+
+                <!-- Game Controls -->
+                <div class="admin-card">
+                    <h3>🎮 Game Controls</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Reset the current game
+                        and return all frontends to the start screen.</p>
+                    <button class="danger-btn" id="resetGameBtn" style="width: 100%;">🔄 Reset Game</button>
                 </div>
 
                 <!-- Tiles Status -->
@@ -520,6 +533,7 @@
                                     <th>#</th>
                                     <th>Team</th>
                                     <th>Score</th>
+                                    <th>Mode</th>
                                     <th>Level</th>
                                     <th>Rondes</th>
                                     <th>Datum</th>
@@ -528,7 +542,7 @@
                             </thead>
                             <tbody id="leaderboardBody">
                                 <tr>
-                                    <td colspan="7" class="empty-message">Laden...</td>
+                                    <td colspan="8" class="empty-message">Laden...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -568,12 +582,36 @@
             document.getElementById('saveSpeedRunConfig').addEventListener('click', saveSpeedRunConfig);
             document.getElementById('refreshLeaderboard').addEventListener('click', refreshLeaderboard);
             document.getElementById('clearLeaderboard').addEventListener('click', clearLeaderboard);
+            document.getElementById('resetGameBtn').addEventListener('click', resetGame);
 
             // Auto-refresh every 5 seconds
             setInterval(loadStatus, 5000);
 
             addLog('Admin dashboard gestart', 'info');
         });
+
+        // Reset game
+        async function resetGame() {
+            if (!confirm('Weet je zeker dat je het huidige spel wilt resetten? Alle frontends keren terug naar het startscherm.')) {
+                return;
+            }
+
+            try {
+                var response = await fetch('/api/admin/reset', { method: 'POST' });
+                var data = await response.json();
+
+                if (response.ok || data.status === 'ok') {
+                    showToast('Game gereset!');
+                    addLog('Game gereset door admin', 'warning');
+                    loadStatus();
+                } else {
+                    showToast('Fout bij resetten: ' + (data.message || 'Onbekende fout'), true);
+                }
+            } catch (error) {
+                showToast('Fout bij resetten', true);
+                console.error('Reset error:', error);
+            }
+        }
 
         // Load live status
         async function loadStatus() {
@@ -590,6 +628,12 @@
                 document.getElementById('tilesConnected').textContent = data.connected_tiles || data.tiles_connected || 0;
                 document.getElementById('frontendsConnected').textContent = data.frontends || 0;
                 document.getElementById('gamesPlayed').textContent = data.games_played || 0;
+
+                // Update game phase
+                var phaseEl = document.getElementById('gamePhase');
+                if (phaseEl && data.game_phase) {
+                    phaseEl.textContent = data.game_phase.replace('_', ' ').toUpperCase();
+                }
 
                 // Load tiles
                 await loadTiles();
@@ -716,7 +760,7 @@
 
                 if (!data.leaderboard || data.leaderboard.length === 0) {
                     leaderboardData = [];
-                    tbody.innerHTML = '<tr><td colspan="7" class="empty-message">Geen scores</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" class="empty-message">Geen scores</td></tr>';
                     return;
                 }
 
@@ -745,6 +789,11 @@
                     var tdScore = document.createElement('td');
                     tdScore.textContent = entry.score;
                     tr.appendChild(tdScore);
+
+                    // Mode
+                    var tdMode = document.createElement('td');
+                    tdMode.textContent = entry.mode || 'classic';
+                    tr.appendChild(tdMode);
 
                     // Level
                     var tdLevel = document.createElement('td');

@@ -1195,16 +1195,25 @@ async def get_tiles_admin():
 
 @app.get("/api/admin/config")
 async def get_config():
+    # Return current game config values (sync admin_config with actual LEVEL_CONFIG)
     return {
-        "levels": admin_config["levels"],
-        "speedRun": admin_config["speedRun"],
+        "levels": {
+            "easy": {"steps": LEVEL_CONFIG["easy"]["base_pattern"], "points": LEVEL_CONFIG["easy"]["base_points"]},
+            "medium": {"steps": LEVEL_CONFIG["medium"]["base_pattern"], "points": LEVEL_CONFIG["medium"]["base_points"]},
+            "hard": {"steps": LEVEL_CONFIG["hard"]["base_pattern"], "points": LEVEL_CONFIG["hard"]["base_points"]}
+        },
+        "speedRun": {
+            "timePerStep": admin_config["speedRun"]["timePerStep"],
+            "bonusPerSecond": SPEEDRUN_CONFIG["easy"]["time_bonus_per_second"]
+        },
         "wrongPenalty": WRONG_PENALTY,
         "totalTiles": TOTAL_TILES
     }
 
 @app.post("/api/admin/config/levels")
 async def save_level_config(config: dict):
-    """Save level configuration"""
+    """Save level configuration - updates both admin_config and LEVEL_CONFIG"""
+    global LEVEL_CONFIG
     try:
         admin_config["levels"] = {
             "easy": {
@@ -1220,6 +1229,15 @@ async def save_level_config(config: dict):
                 "points": config.get("hard", {}).get("points", 25)
             }
         }
+        
+        # Also update LEVEL_CONFIG to apply changes to the game
+        LEVEL_CONFIG["easy"]["base_pattern"] = admin_config["levels"]["easy"]["steps"]
+        LEVEL_CONFIG["easy"]["base_points"] = admin_config["levels"]["easy"]["points"]
+        LEVEL_CONFIG["medium"]["base_pattern"] = admin_config["levels"]["medium"]["steps"]
+        LEVEL_CONFIG["medium"]["base_points"] = admin_config["levels"]["medium"]["points"]
+        LEVEL_CONFIG["hard"]["base_pattern"] = admin_config["levels"]["hard"]["steps"]
+        LEVEL_CONFIG["hard"]["base_points"] = admin_config["levels"]["hard"]["points"]
+        
         logger.info(f"Level config updated: {admin_config['levels']}")
         return {"status": "ok", "config": admin_config["levels"]}
     except Exception as e:
@@ -1228,12 +1246,18 @@ async def save_level_config(config: dict):
 
 @app.post("/api/admin/config/speedrun")
 async def save_speedrun_config(config: dict):
-    """Save speed run configuration"""
+    """Save speed run configuration - updates both admin_config and SPEEDRUN_CONFIG"""
+    global SPEEDRUN_CONFIG
     try:
         admin_config["speedRun"] = {
             "timePerStep": config.get("timePerStep", 3),
             "bonusPerSecond": config.get("bonusPerSecond", 2)
         }
+        
+        # Also update SPEEDRUN_CONFIG to apply changes to the game
+        for level in ["easy", "medium", "hard"]:
+            SPEEDRUN_CONFIG[level]["time_bonus_per_second"] = admin_config["speedRun"]["bonusPerSecond"]
+        
         logger.info(f"Speed run config updated: {admin_config['speedRun']}")
         return {"status": "ok", "config": admin_config["speedRun"]}
     except Exception as e:
