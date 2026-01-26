@@ -1100,21 +1100,55 @@ async def handle_master_message(msg: dict):
         await broadcast_tile_status()
         
     elif event == "start_button_pressed":
-        logger.info("→ START button pressed")
+        logger.info(f"→ START button pressed (phase: {state.game.phase})")
         
         if state.game.phase == GamePhase.REGISTERED:
             # Start first round
             await start_new_round()
+        elif state.game.phase == GamePhase.GAME_OVER:
+            # Player pressed start after game over - allow restart if team is registered
+            if state.game.team_name:
+                state.game.phase = GamePhase.REGISTERED
+                state.game.round_number = 0
+                state.game.score = 0
+                state.game.pattern = []
+                state.game.selected_tiles = set()
+                state.game.player_sequence = []
+                state.game.score_submitted = False
+                # Cancel any existing speedrun timer
+                if state.game.speedrun_timer_task:
+                    state.game.speedrun_timer_task.cancel()
+                    state.game.speedrun_timer_task = None
+                state.game.speedrun_start_time = 0
+                state.game.speedrun_time_limit = 0
+                await start_new_round()
+            else:
+                await broadcast_to_frontends({
+                    "event": "info",
+                    "data": {"message": "Register a team first!"}
+                })
         elif state.game.phase == GamePhase.SELECTING:
             # Clear tiles immediately before validating
             await send_to_master({"event": "clear_tiles", "data": {}})
             # Confirm selection
             await validate_selection()
         elif state.game.phase == GamePhase.IDLE:
-            await broadcast_to_frontends({
-                "event": "info",
-                "data": {"message": "Register a team first!"}
-            })
+            # Check if we have a team name from previous game
+            if state.game.team_name:
+                # Re-register the team and start
+                state.game.phase = GamePhase.REGISTERED
+                state.game.round_number = 0
+                state.game.score = 0
+                state.game.pattern = []
+                state.game.selected_tiles = set()
+                state.game.player_sequence = []
+                state.game.score_submitted = False
+                await start_new_round()
+            else:
+                await broadcast_to_frontends({
+                    "event": "info",
+                    "data": {"message": "Register a team first!"}
+                })
     
     elif event == "confirm_button_pressed":
         if state.game.phase == GamePhase.SELECTING:
