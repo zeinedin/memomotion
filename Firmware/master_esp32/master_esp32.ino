@@ -481,7 +481,11 @@ void handleBackendMessage(const char* json) {
             }
         }
         delay(500);
-        turnAllTilesOff();
+        // Turn off all tiles - send multiple times for reliability
+        for (int retry = 0; retry < 3; retry++) {
+            turnAllTilesOff();
+            delay(50);
+        }
         
         // Note: We keep gameActive = true because the next round follows automatically
     }

@@ -636,7 +636,20 @@ async def start_new_round():
         await end_game_win()
         return True
     
-    state.game.pattern = random.sample(connected, min(pattern_length, len(connected)))
+    # Simon Says: build on previous pattern by adding one new tile each round
+    if state.game.mode == GameMode.SIMON:
+        if state.game.round_number == 1:
+            # First round: start with 1 random tile
+            state.game.pattern = [random.choice(connected)]
+        else:
+            # Subsequent rounds: add one new random tile to existing pattern
+            # Choose from tiles not recently used to add variety
+            available = [t for t in connected if t != state.game.pattern[-1]] if len(connected) > 1 else connected
+            new_tile = random.choice(available)
+            state.game.pattern.append(new_tile)
+    else:
+        # Other modes: generate fresh random pattern
+        state.game.pattern = random.sample(connected, min(pattern_length, len(connected)))
     
     logger.info(f"Round {state.game.round_number}: Pattern {state.game.pattern} (length={len(state.game.pattern)}, mode={state.game.mode.value})")
     
@@ -678,7 +691,12 @@ async def start_new_round():
     })
     
     # Wait for pattern display time
-    await asyncio.sleep(show_time)
+    # For Simon Says (sequential), need more time: 0.8s per tile + buffer
+    if state.game.mode == GameMode.SIMON:
+        sequential_time = len(state.game.pattern) * 0.8 + 0.5  # 800ms per tile + 500ms buffer
+        await asyncio.sleep(max(sequential_time, show_time))
+    else:
+        await asyncio.sleep(show_time)
     
     # Enter selecting phase
     await enter_selecting_phase()
