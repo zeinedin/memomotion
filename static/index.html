@@ -71,11 +71,11 @@
                                 <span class="mode-desc">Growing pattern</span>
                             </div>
                         </button>
-                        <button class="mode-btn disabled" data-mode="speedrun" disabled>
+                        <button class="mode-btn" data-mode="speedrun">
                             <span class="mode-icon">⚡</span>
                             <div class="mode-info">
                                 <span class="mode-name">SPEED RUN</span>
-                                <span class="mode-desc">Coming soon</span>
+                                <span class="mode-desc">Race the clock</span>
                             </div>
                         </button>
                     </div>
@@ -160,6 +160,16 @@
                     <div class="stat-content">
                         <span class="stat-value" id="roundNumber">0</span>
                         <span class="stat-label">ROUND</span>
+                    </div>
+                </div>
+                <div class="stat-box timer-box" id="timerBox" style="display: none;">
+                    <div class="stat-icon">⏱️</div>
+                    <div class="stat-content">
+                        <span class="stat-value" id="timerValue">60</span>
+                        <span class="stat-label">SECONDS</span>
+                    </div>
+                    <div class="timer-bar-container">
+                        <div class="timer-bar" id="timerBar"></div>
                     </div>
                 </div>
             </div>

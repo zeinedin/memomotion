@@ -593,6 +593,10 @@ body {
     margin-bottom: 1rem;
 }
 
+.game-stats:has(.timer-box[style*="flex"]) {
+    grid-template-columns: repeat(3, 1fr);
+}
+
 .stat-box {
     display: flex;
     align-items: center;
@@ -623,6 +627,85 @@ body {
     background: linear-gradient(135deg, var(--neon-green), var(--neon-cyan));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+}
+
+/* Speedrun Timer Styles */
+.timer-box {
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    border: 1px solid var(--neon-cyan);
+    background: rgba(0, 245, 255, 0.1);
+}
+
+.timer-box .stat-value {
+    background: linear-gradient(135deg, var(--neon-cyan), #00ccff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-size: 2rem;
+}
+
+.timer-box .stat-content {
+    text-align: center;
+}
+
+.timer-bar-container {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    margin-top: 0.5rem;
+    overflow: hidden;
+}
+
+.timer-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-green));
+    border-radius: 2px;
+    transition: width 0.5s linear;
+}
+
+.timer-box.timer-warning {
+    border-color: var(--neon-orange);
+    background: rgba(255, 102, 0, 0.15);
+}
+
+.timer-box.timer-warning .stat-value {
+    background: linear-gradient(135deg, var(--neon-orange), var(--neon-yellow));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.timer-box.timer-warning .timer-bar {
+    background: linear-gradient(90deg, var(--neon-orange), var(--neon-yellow));
+}
+
+.timer-box.timer-critical {
+    border-color: var(--neon-red);
+    background: rgba(255, 0, 68, 0.2);
+    animation: timerPulse 0.5s ease-in-out infinite;
+}
+
+.timer-box.timer-critical .stat-value {
+    background: linear-gradient(135deg, var(--neon-red), #ff3366);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.timer-box.timer-critical .timer-bar {
+    background: var(--neon-red);
+}
+
+@keyframes timerPulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.02);
+    }
 }
 
 .stat-label {

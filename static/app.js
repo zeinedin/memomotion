@@ -63,6 +63,11 @@ const gameState = {
   isShowingPattern: false,
   isSelectingPhase: false,
   scoreSubmitted: false,
+
+  // Speedrun timer
+  speedrunTimeRemaining: 0,
+  speedrunTimeLimit: 0,
+  isSpeedrun: false,
 };
 
 // ==================== DOM ELEMENTS ====================
@@ -109,6 +114,11 @@ function cacheElements() {
   elements.tileGrid = document.getElementById('tileGrid');
   elements.stepsSection = document.getElementById('stepsSection');
   elements.stepsGrid = document.getElementById('stepsGrid');
+
+  // Speedrun timer elements
+  elements.timerBox = document.getElementById('timerBox');
+  elements.timerValue = document.getElementById('timerValue');
+  elements.timerBar = document.getElementById('timerBar');
 
   // Leaderboard
   elements.leaderboardFull = document.getElementById('leaderboardFull');
@@ -330,6 +340,14 @@ function handleMessage(msg) {
       handleGameOver(data);
       break;
 
+    case 'game_won':
+      handleGameWon(data);
+      break;
+
+    case 'speedrun_timer':
+      handleSpeedrunTimer(data);
+      break;
+
     case 'error':
       setMessage('❌', data.message || 'Error');
       break;
@@ -387,6 +405,18 @@ function handleGameStarted(data) {
 
   if (data.round === 1) {
     gameState.score = 0;
+  }
+
+  // Handle Speedrun mode
+  if (data.speedrun) {
+    gameState.isSpeedrun = true;
+    gameState.speedrunTimeRemaining = data.time_remaining || 0;
+    gameState.speedrunTimeLimit = data.time_limit || 60;
+    showSpeedrunTimer(true);
+    updateSpeedrunTimer(data.time_remaining, data.time_limit);
+  } else {
+    gameState.isSpeedrun = false;
+    showSpeedrunTimer(false);
   }
 
   updateGameUI();
@@ -456,6 +486,8 @@ function handlePatternCorrect(data) {
 function handleGameOver(data) {
   gameState.isPlaying = false;
   gameState.isSelectingPhase = false;
+  gameState.isSpeedrun = false;
+  showSpeedrunTimer(false);
   gameState.score = data.final_score ?? gameState.score;
   gameState.round = data.rounds ?? gameState.round;
 
@@ -465,8 +497,11 @@ function handleGameOver(data) {
   elements.finalLevel.textContent =
     LEVEL_CONFIG[gameState.level]?.label || gameState.level;
 
-  // Set title
-  if (gameState.score >= 100) {
+  // Set title based on timeout or score
+  if (data.timeout) {
+    elements.gameOverTitle.innerHTML =
+      '<span class="title-icon">⏱️</span> TIME\'S UP!';
+  } else if (gameState.score >= 100) {
     elements.gameOverTitle.innerHTML =
       '<span class="title-icon">🏆</span> INCREDIBLE!';
   } else if (gameState.score >= 50) {
@@ -481,6 +516,64 @@ function handleGameOver(data) {
   }
 
   showScreen('gameOver');
+}
+
+function handleGameWon(data) {
+  gameState.isPlaying = false;
+  gameState.isSelectingPhase = false;
+  gameState.isSpeedrun = false;
+  showSpeedrunTimer(false);
+  gameState.score = data.final_score ?? gameState.score;
+  gameState.round = data.rounds ?? gameState.round;
+
+  // Update game over screen with win message
+  elements.finalScore.textContent = gameState.score;
+  elements.finalRounds.textContent = gameState.round;
+  elements.finalLevel.textContent =
+    LEVEL_CONFIG[gameState.level]?.label || gameState.level;
+
+  elements.gameOverTitle.innerHTML =
+    '<span class="title-icon">🏆</span> YOU WIN!';
+
+  showScreen('gameOver');
+}
+
+// ==================== SPEEDRUN TIMER ====================
+function handleSpeedrunTimer(data) {
+  if (!gameState.isSpeedrun) return;
+
+  gameState.speedrunTimeRemaining = data.time_remaining || 0;
+  gameState.speedrunTimeLimit = data.time_limit || 60;
+  updateSpeedrunTimer(data.time_remaining, data.time_limit);
+}
+
+function showSpeedrunTimer(show) {
+  if (elements.timerBox) {
+    elements.timerBox.style.display = show ? 'flex' : 'none';
+  }
+}
+
+function updateSpeedrunTimer(timeRemaining, timeLimit) {
+  if (!elements.timerValue || !elements.timerBar) return;
+
+  // Update timer value
+  const seconds = Math.ceil(timeRemaining);
+  elements.timerValue.textContent = seconds;
+
+  // Update timer bar
+  const percentage = (timeRemaining / timeLimit) * 100;
+  elements.timerBar.style.width = `${percentage}%`;
+
+  // Color coding based on time remaining
+  if (timeRemaining <= 10) {
+    elements.timerBox.classList.add('timer-critical');
+    elements.timerBox.classList.remove('timer-warning');
+  } else if (timeRemaining <= 20) {
+    elements.timerBox.classList.add('timer-warning');
+    elements.timerBox.classList.remove('timer-critical');
+  } else {
+    elements.timerBox.classList.remove('timer-warning', 'timer-critical');
+  }
 }
 
 // ==================== UI UPDATES ====================
@@ -766,6 +859,12 @@ function resetGameState() {
   gameState.playerSequence = [];
   gameState.isShowingPattern = false;
   gameState.isSelectingPhase = false;
+
+  // Reset speedrun state
+  gameState.isSpeedrun = false;
+  gameState.speedrunTimeRemaining = 0;
+  gameState.speedrunTimeLimit = 0;
+  showSpeedrunTimer(false);
 
   elements.stepsSection?.classList.remove('visible');
   clearTileStates();

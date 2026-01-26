@@ -70,6 +70,13 @@ class TileInfo:
     last_seen: float = 0
     battery: int = 100
 
+# Speedrun configuration
+SPEEDRUN_CONFIG = {
+    "easy": {"time_limit": 60, "time_bonus_per_second": 5, "base_pattern": 2},
+    "medium": {"time_limit": 45, "time_bonus_per_second": 8, "base_pattern": 3},
+    "hard": {"time_limit": 30, "time_bonus_per_second": 12, "base_pattern": 4}
+}
+
 @dataclass
 class GameSession:
     team_name: str = ""
@@ -83,6 +90,10 @@ class GameSession:
     selected_tiles: Set[int] = field(default_factory=set)
     score_submitted: bool = False
     phase_start_time: float = 0
+    # Speedrun specific fields
+    speedrun_start_time: float = 0
+    speedrun_time_limit: float = 0
+    speedrun_timer_task: Optional[asyncio.Task] = None
     
     def reset(self):
         self.team_name = ""
@@ -96,6 +107,11 @@ class GameSession:
         self.selected_tiles = set()
         self.score_submitted = False
         self.phase_start_time = 0
+        self.speedrun_start_time = 0
+        self.speedrun_time_limit = 0
+        if self.speedrun_timer_task:
+            self.speedrun_timer_task.cancel()
+        self.speedrun_timer_task = None
 
 # ==================== GLOBAL STATE ====================
 class AppState:
@@ -223,9 +239,9 @@ def calculate_pattern_length() -> int:
         
         return min(pattern_length, max_tiles)
     else:
-        # Speedrun: starts at base, adds 1 tile per round (progressive difficulty)
-        # Round 1: base tiles, Round 2: base+1, Round 3: base+2, etc.
-        pattern_length = base + (state.game.round_number - 1)
+        # Speedrun: fixed pattern size based on level, focus on speed not memory growth
+        speedrun_base = SPEEDRUN_CONFIG[state.game.level]["base_pattern"]
+        pattern_length = speedrun_base + min(state.game.round_number - 1, 2)  # Max +2 tiles
         return min(pattern_length, max_tiles)
 
 def calculate_points(correct: bool) -> int:
@@ -233,9 +249,96 @@ def calculate_points(correct: bool) -> int:
     if not correct:
         return -WRONG_PENALTY
     
+    # Speedrun mode: points based on time remaining
+    if state.game.mode == GameMode.SPEEDRUN:
+        return calculate_speedrun_points()
+    
     config = LEVEL_CONFIG[state.game.level]
     # Points = (round * multiplier * 10) + base
     return (state.game.round_number * config["multiplier"] * 10) + config["base_points"]
+
+def calculate_speedrun_points() -> int:
+    """Calculate points for Speedrun mode based on time remaining"""
+    config = SPEEDRUN_CONFIG[state.game.level]
+    time_remaining = get_speedrun_time_remaining()
+    
+    # Base points for correct pattern + bonus for remaining time
+    base_points = 50 + (state.game.round_number * 10)
+    time_bonus = int(time_remaining * config["time_bonus_per_second"])
+    
+    return base_points + time_bonus
+
+def get_speedrun_time_remaining() -> float:
+    """Get remaining time in Speedrun mode"""
+    if state.game.speedrun_start_time == 0:
+        return 0
+    
+    elapsed = asyncio.get_event_loop().time() - state.game.speedrun_start_time
+    remaining = state.game.speedrun_time_limit - elapsed
+    return max(0, remaining)
+
+async def speedrun_timer_loop():
+    """Background task to update speedrun timer and check for timeout"""
+    try:
+        while state.game.mode == GameMode.SPEEDRUN and state.game.phase != GamePhase.GAME_OVER:
+            time_remaining = get_speedrun_time_remaining()
+            
+            # Broadcast timer update to frontends
+            await broadcast_to_frontends({
+                "event": "speedrun_timer",
+                "data": {
+                    "time_remaining": round(time_remaining, 1),
+                    "time_limit": state.game.speedrun_time_limit
+                }
+            })
+            
+            # Check for timeout
+            if time_remaining <= 0:
+                logger.info("⏱️ Speedrun time's up!")
+                await end_game_timeout()
+                break
+            
+            await asyncio.sleep(0.5)  # Update every 500ms
+    except asyncio.CancelledError:
+        pass
+    except Exception as e:
+        logger.error(f"Speedrun timer error: {e}")
+
+async def end_game_timeout():
+    """End game due to Speedrun timeout"""
+    state.game.phase = GamePhase.GAME_OVER
+    state.games_played += 1
+    
+    logger.info(f"⏱️ Time's up! Final score: {state.game.score}")
+    
+    # Cancel timer task
+    if state.game.speedrun_timer_task:
+        state.game.speedrun_timer_task.cancel()
+        state.game.speedrun_timer_task = None
+    
+    # Tell master to turn off all tiles
+    await send_to_master({"event": "game_over", "data": {}})
+    await asyncio.sleep(0.2)
+    await send_to_master({"event": "clear_tiles", "data": {}})
+    
+    # Save score
+    await save_score()
+    
+    await broadcast_to_frontends({
+        "event": "game_over",
+        "data": {
+            "message": "⏱️ Time's Up! Game Over",
+            "final_score": state.game.score,
+            "rounds": state.game.round_number,
+            "team_name": state.game.team_name,
+            "level": state.game.level,
+            "timeout": True
+        }
+    })
+    
+    # Reset game state after delay
+    await asyncio.sleep(2)
+    state.game.phase = GamePhase.IDLE
 
 async def broadcast_tile_status(force: bool = False):
     """Broadcast tile status to frontends - with deduplication"""
@@ -448,6 +551,15 @@ async def start_new_round():
     state.game.selected_tiles = set()
     state.game.phase_start_time = asyncio.get_event_loop().time()
     
+    # Initialize Speedrun timer on first round
+    if state.game.mode == GameMode.SPEEDRUN and state.game.round_number == 1:
+        config = SPEEDRUN_CONFIG[state.game.level]
+        state.game.speedrun_time_limit = config["time_limit"]
+        state.game.speedrun_start_time = asyncio.get_event_loop().time()
+        # Start timer background task
+        state.game.speedrun_timer_task = asyncio.create_task(speedrun_timer_loop())
+        logger.info(f"⏱️ Speedrun started: {state.game.speedrun_time_limit}s timer")
+    
     # Generate pattern
     pattern_length = calculate_pattern_length()
     
@@ -465,18 +577,26 @@ async def start_new_round():
     show_time = LEVEL_CONFIG[state.game.level]["show_time"]
     
     # Tell frontends
+    game_data = {
+        "phase": "showing_pattern",
+        "pattern": state.game.pattern,
+        "pattern_length": len(state.game.pattern),
+        "round": state.game.round_number,
+        "score": state.game.score,
+        "display_mode": display_mode,
+        "show_time": show_time,
+        "message": f"Ronde {state.game.round_number} - Onthoud {len(state.game.pattern)} tegels!"
+    }
+    
+    # Add speedrun info if applicable
+    if state.game.mode == GameMode.SPEEDRUN:
+        game_data["speedrun"] = True
+        game_data["time_remaining"] = round(get_speedrun_time_remaining(), 1)
+        game_data["time_limit"] = state.game.speedrun_time_limit
+    
     await broadcast_to_frontends({
         "event": "game_started",
-        "data": {
-            "phase": "showing_pattern",
-            "pattern": state.game.pattern,
-            "pattern_length": len(state.game.pattern),
-            "round": state.game.round_number,
-            "score": state.game.score,
-            "display_mode": display_mode,
-            "show_time": show_time,
-            "message": f"Ronde {state.game.round_number} - Onthoud {len(state.game.pattern)} tegels!"
-        }
+        "data": game_data
     })
     
     # Tell master to show pattern
@@ -622,6 +742,11 @@ async def end_game_win():
     state.game.phase = GamePhase.GAME_OVER
     state.games_played += 1
     
+    # Cancel speedrun timer if running
+    if state.game.speedrun_timer_task:
+        state.game.speedrun_timer_task.cancel()
+        state.game.speedrun_timer_task = None
+    
     # Bonus points for winning!
     bonus_points = 100
     state.game.score += bonus_points
@@ -659,6 +784,11 @@ async def end_game_win():
 async def end_game_wrong():
     """End game due to wrong selection"""
     state.game.phase = GamePhase.GAME_OVER
+    
+    # Cancel speedrun timer if running
+    if state.game.speedrun_timer_task:
+        state.game.speedrun_timer_task.cancel()
+        state.game.speedrun_timer_task = None
     
     # Apply penalty
     state.game.score = max(0, state.game.score - WRONG_PENALTY)
