@@ -49,8 +49,8 @@ class GameMode(str, Enum):
 
 # Level configurations
 LEVEL_CONFIG = {
-    "easy": {"base_pattern": 1, "multiplier": 1, "base_points": 20, "show_time":8},
-    "medium": {"base_pattern": 3, "multiplier": 2, "base_points": 30, "show_time": 6},
+    "easy": {"base_pattern": 1, "multiplier": 1, "base_points": 20, "show_time": 6},
+    "medium": {"base_pattern": 3, "multiplier": 2, "base_points": 30, "show_time": 5},
     "hard": {"base_pattern": 5, "multiplier": 3, "base_points": 50, "show_time": 4}
 }
 
