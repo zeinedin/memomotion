@@ -324,6 +324,21 @@ async def speedrun_timer_loop():
                     logger.error(f"⏱️ Error in end_game_timeout: {e}")
                     import traceback
                     traceback.print_exc()
+                break  # Exit the loop after timeout
+            
+            await asyncio.sleep(0.5)  # Update every 500ms
+    except asyncio.CancelledError:
+        logger.info("⏱️ Timer loop cancelled")
+    except Exception as e:
+        logger.error(f"⏱️ Timer loop error: {e}")
+    finally:
+        logger.info("⏱️ Speedrun timer loop ended")
+
+
+async def end_game_timeout():
+    """Handle speedrun timeout - end the game"""
+    logger.info("end_game_timeout: CALLED")
+    
     state.game.phase = GamePhase.GAME_OVER
     state.games_played += 1
     
