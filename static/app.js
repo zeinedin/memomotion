@@ -467,6 +467,13 @@ function handleSelectingPhase(data) {
   // Clear pattern display
   clearPatternDisplay();
 
+  // Hide tile numbers in Classic mode after pattern is shown
+  if (gameState.mode === 'classic') {
+    document.querySelectorAll('.tile').forEach((tile) => {
+      tile.classList.add('hide-number');
+    });
+  }
+
   setMessage('👆', data.message || 'Select the tiles!');
   showSelectionUI(data.pattern_length);
 }
@@ -680,15 +687,12 @@ function buildTileGrid() {
   if (!elements.tileGrid) return;
 
   const connectedSet = new Set(gameState.connectedTiles);
-  // Hide tile numbers in Classic mode
-  const hideTileNumbers = gameState.mode === 'classic';
 
   elements.tileGrid.innerHTML = Array.from({ length: TOTAL_TILES }, (_, i) => {
     const tileId = i + 1;
     const isConnected = connectedSet.has(tileId);
     const classes = ['tile'];
     if (!isConnected) classes.push('offline');
-    if (hideTileNumbers) classes.push('hide-number');
 
     return `
             <div class="${classes.join(' ')}" data-tile-id="${tileId}" id="tile-${tileId}">
@@ -740,7 +744,14 @@ function updateTileSelection(tileId, isSelected) {
 
 function clearTileStates() {
   document.querySelectorAll('.tile').forEach((tile) => {
-    tile.classList.remove('pattern', 'selected', 'active', 'correct', 'wrong');
+    tile.classList.remove(
+      'pattern',
+      'selected',
+      'active',
+      'correct',
+      'wrong',
+      'hide-number',
+    );
   });
 }
 
