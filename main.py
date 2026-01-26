@@ -1,4 +1,4 @@
-"""
+﻿"""
 Memory XXL Backend - ROBUST VERSION
 Production-ready with proper state machine and error handling
 Version: 2.1 - Fixed speedrun timer timeout
@@ -1376,5 +1376,4 @@ async def startup():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
- 
- 
+
