@@ -519,6 +519,8 @@ function handlePatternCorrect(data) {
 }
 
 function handleGameOver(data) {
+  console.log('🎮 handleGameOver called:', data);
+  
   gameState.isPlaying = false;
   gameState.isSelectingPhase = false;
   gameState.isSpeedrun = false;
@@ -550,6 +552,7 @@ function handleGameOver(data) {
       '<span class="title-icon">🎮</span> GAME OVER';
   }
 
+  console.log('🎮 Showing gameOver screen');
   showScreen('gameOver');
 }
 
@@ -580,6 +583,17 @@ function handleSpeedrunTimer(data) {
   gameState.speedrunTimeRemaining = data.time_remaining || 0;
   gameState.speedrunTimeLimit = data.time_limit || 60;
   updateSpeedrunTimer(data.time_remaining, data.time_limit);
+
+  // Client-side safeguard: if time reaches 0, show game over
+  if (data.time_remaining <= 0 && gameState.isPlaying) {
+    console.log('⏱️ Timer reached 0 - triggering game over');
+    handleGameOver({
+      timeout: true,
+      final_score: gameState.score,
+      rounds: gameState.round,
+      mode: 'speedrun'
+    });
+  }
 }
 
 function showSpeedrunTimer(show) {
