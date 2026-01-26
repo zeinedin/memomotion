@@ -448,7 +448,10 @@ function handleGameStarted(data) {
   }
 
   updateGameUI();
-  setMessage('🧠', data.message || `Round ${data.round}`);
+  setMessage(
+    '👽',
+    data.message || `Sequence ${data.round} - ZAP is transmitting!`,
+  );
 
   // Display pattern
   if (data.display_mode === 'sequential') {
@@ -474,7 +477,7 @@ function handleSelectingPhase(data) {
     });
   }
 
-  setMessage('👆', data.message || 'Select the tiles!');
+  setMessage('�', data.message || 'Run to the tiles! Fuel the ship!');
   showSelectionUI(data.pattern_length);
 }
 
@@ -508,7 +511,7 @@ function handlePatternCorrect(data) {
   gameState.isSelectingPhase = false;
 
   updateGameUI();
-  setMessage('🎉', data.message || 'Perfect!');
+  setMessage('⛽', data.message || 'Fuel collected! ZAP is happy!');
 
   // Flash success on tiles
   clearTileStates();
@@ -534,22 +537,25 @@ function handleGameOver(data) {
   elements.finalLevel.textContent =
     LEVEL_CONFIG[gameState.level]?.label || gameState.level;
 
-  // Set title based on timeout or score
+  // Set title based on timeout or score - ZAP theme
   if (data.timeout) {
     elements.gameOverTitle.innerHTML =
-      '<span class="title-icon">⏱️</span> TIME\'S UP!';
+      '<span class="title-icon">⏱️</span> TIME\'S UP! ZAP is stranded!';
+  } else if (gameState.score >= 1000) {
+    elements.gameOverTitle.innerHTML =
+      '<span class="title-icon">🚀</span> LAUNCH SUCCESS!';
+  } else if (gameState.score >= 500) {
+    elements.gameOverTitle.innerHTML =
+      '<span class="title-icon">🛸</span> ALMOST THERE!';
   } else if (gameState.score >= 100) {
     elements.gameOverTitle.innerHTML =
-      '<span class="title-icon">🏆</span> INCREDIBLE!';
-  } else if (gameState.score >= 50) {
-    elements.gameOverTitle.innerHTML =
-      '<span class="title-icon">⭐</span> GREAT JOB!';
+      '<span class="title-icon">👽</span> GOOD EFFORT!';
   } else if (gameState.score > 0) {
     elements.gameOverTitle.innerHTML =
-      '<span class="title-icon">👍</span> NICE TRY!';
+      '<span class="title-icon">💫</span> ZAP believes in you!';
   } else {
     elements.gameOverTitle.innerHTML =
-      '<span class="title-icon">🎮</span> GAME OVER';
+      '<span class="title-icon">👽</span> MISSION FAILED';
   }
 
   console.log('🎮 Showing gameOver screen');
@@ -571,7 +577,7 @@ function handleGameWon(data) {
     LEVEL_CONFIG[gameState.level]?.label || gameState.level;
 
   elements.gameOverTitle.innerHTML =
-    '<span class="title-icon">🏆</span> YOU WIN!';
+    '<span class="title-icon">🚀</span> ZAP ESCAPED! YOU WIN!';
 
   showScreen('gameOver');
 }
@@ -787,7 +793,10 @@ function displayPatternSimultaneous(pattern, duration = 5) {
     }
   });
 
-  setMessage('🧠', `Memorize ${pattern.length} tiles! (${duration}s)`);
+  setMessage(
+    '👽',
+    `ZAP shows ${pattern.length} tiles! Memorize the launch sequence! (${duration}s)`,
+  );
 }
 
 function displayPatternSequential(pattern) {
@@ -805,7 +814,7 @@ function displayPatternSequential(pattern) {
         tile.classList.add('pattern', 'active');
       }
 
-      setMessage('🎯', `Step ${index + 1}/${pattern.length}`);
+      setMessage('🛸', `Signal ${index + 1}/${pattern.length}`);
 
       // Hide after delay
       setTimeout(() => {
@@ -840,11 +849,11 @@ function updateSelectionCounter(selected, expected) {
 
   const remaining = expected - selected;
   if (remaining > 0) {
-    setMessage('👆', `${remaining} more tile(s) to select`);
+    setMessage('�', `${remaining} more tile(s) to power up!`);
   } else if (remaining === 0) {
-    setMessage('✅', 'Press CONFIRM!');
+    setMessage('🚀', 'Ready for launch! Press CONFIRM!');
   } else {
-    setMessage('⚠️', `Too many selected (${-remaining} extra)`);
+    setMessage('⚠️', `Overload! Too many selected (${-remaining} extra)`);
   }
 }
 
@@ -906,7 +915,7 @@ async function startGame() {
   buildTileGrid();
 
   showScreen('game');
-  setMessage('🎮', 'Press START on the master to begin!');
+  setMessage('👽', 'ZAP is ready! Press START to begin the rescue mission!');
 }
 
 function showError(msg) {

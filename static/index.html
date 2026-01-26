@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Memo Motion</title>
+    <title>ZAP - Escape from Nexora</title>
     <link rel="stylesheet" href="/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link
@@ -25,36 +25,38 @@
             <header class="hero">
                 <div class="logo-container">
                     <div class="logo-glow"></div>
-                    <h1 class="logo">MEMO<span class="logo-xxl">MOTION</span></h1>
+                    <h1 class="logo">ZAP<span class="logo-xxl">🛸</span></h1>
                 </div>
-                <p class="tagline">🧠 Test Your Memory • Beat The Challenge 🎮</p>
+                <p class="tagline">🌌 Escape from Nexora • Help ZAP get home! 👽</p>
+                <p class="story-intro">A stranded alien needs your help! Watch the pattern, run to the tiles, fuel the
+                    ship.</p>
             </header>
 
             <div class="card glass-card">
                 <div class="card-header">
-                    <span class="card-icon">👥</span>
-                    <h2>Team Setup</h2>
+                    <span class="card-icon">👽</span>
+                    <h2>Rescue Team Setup</h2>
                 </div>
 
                 <div class="form-group">
                     <label for="teamName">
-                        <span class="label-icon">🏷️</span> Team Name
+                        <span class="label-icon">🏷️</span> Crew Name
                     </label>
                     <div class="input-wrapper">
-                        <input type="text" id="teamName" placeholder="Enter your team name..." maxlength="20"
+                        <input type="text" id="teamName" placeholder="Enter your crew name..." maxlength="20"
                             autocomplete="off">
                     </div>
                     <span id="teamNameError" class="input-error" style="display: none;"></span>
                 </div>
 
                 <div class="form-group">
-                    <label><span class="label-icon">🎮</span> Game Mode</label>
+                    <label><span class="label-icon">🚀</span> Mission Type</label>
                     <div class="mode-selector">
                         <button class="mode-btn active" data-mode="classic">
-                            <span class="mode-icon">🧠</span>
+                            <span class="mode-icon">🛸</span>
                             <div class="mode-info">
                                 <span class="mode-name">CLASSIC</span>
-                                <span class="mode-desc">Repeat the pattern</span>
+                                <span class="mode-desc">Standard launch sequence</span>
                             </div>
                         </button>
                         <button class="mode-btn" data-mode="simon">
@@ -74,8 +76,8 @@
                         <button class="mode-btn" data-mode="speedrun">
                             <span class="mode-icon">⚡</span>
                             <div class="mode-info">
-                                <span class="mode-name">SPEED RUN</span>
-                                <span class="mode-desc">Race the clock</span>
+                                <span class="mode-name">EMERGENCY</span>
+                                <span class="mode-desc">Race against time!</span>
                             </div>
                         </button>
                     </div>
@@ -112,14 +114,14 @@
                 </div>
 
                 <button id="startGameBtn" class="btn btn-play">
-                    <span class="btn-text">🎮 START GAME</span>
+                    <span class="btn-text">🚀 LAUNCH MISSION</span>
                 </button>
             </div>
 
             <div class="card glass-card">
                 <div class="card-header">
                     <span class="card-icon">🏆</span>
-                    <h2>Leaderboard</h2>
+                    <h2>Top Pilots</h2>
                 </div>
                 <div id="leaderboardPreview" class="leaderboard-list">
                     <div class="loading-spinner">
@@ -136,9 +138,9 @@
         <div class="container">
             <header class="game-header">
                 <div class="player-info">
-                    <div class="player-avatar">👤</div>
+                    <div class="player-avatar">👽</div>
                     <div class="player-details">
-                        <span class="player-name" id="currentTeamName">Team</span>
+                        <span class="player-name" id="currentTeamName">Crew</span>
                         <span class="player-level">
                             <span id="currentMode">Classic</span> • <span id="currentLevel">Easy</span>
                         </span>
@@ -149,17 +151,17 @@
 
             <div class="game-stats">
                 <div class="stat-box score-box">
-                    <div class="stat-icon">⭐</div>
+                    <div class="stat-icon">⛽</div>
                     <div class="stat-content">
                         <span class="stat-value" id="currentScore">0</span>
-                        <span class="stat-label">SCORE</span>
+                        <span class="stat-label">FUEL</span>
                     </div>
                 </div>
                 <div class="stat-box round-box">
-                    <div class="stat-icon">🎯</div>
+                    <div class="stat-icon">🛸</div>
                     <div class="stat-content">
                         <span class="stat-value" id="roundNumber">0</span>
-                        <span class="stat-label">ROUND</span>
+                        <span class="stat-label">SEQUENCE</span>
                     </div>
                 </div>
                 <div class="stat-box timer-box" id="timerBox" style="display: none;">
@@ -177,7 +179,7 @@
             <div class="connection-status">
                 <div class="status-item">
                     <span class="status-indicator" id="masterDot"></span>
-                    <span id="masterStatus">Master: Waiting...</span>
+                    <span id="masterStatus">Hub: Waiting...</span>
                 </div>
                 <div class="status-item">
                     <span class="status-indicator" id="tilesDot"></span>
@@ -186,19 +188,20 @@
             </div>
 
             <div class="game-message-container">
-                <div class="message-icon" id="messageIcon">🎮</div>
-                <div class="message-text" id="messageText">Press START to begin!</div>
+                <div class="message-icon" id="messageIcon">👽</div>
+                <div class="message-text" id="messageText">ZAP needs your help! Press START to begin the launch
+                    sequence!</div>
             </div>
 
             <div class="card glass-card game-arena">
-                <h3 class="arena-title"><span class="arena-icon">🎯</span> Game Arena</h3>
+                <h3 class="arena-title"><span class="arena-icon">🛸</span> Launch Pad</h3>
                 <div class="tile-grid" id="tileGrid">
                     <!-- Tiles generated by JS -->
                 </div>
             </div>
 
             <div class="card glass-card steps-card" id="stepsSection">
-                <h3 class="section-title"><span class="section-icon">👟</span> Your Selection</h3>
+                <h3 class="section-title"><span class="section-icon">👟</span> Your Sequence</h3>
                 <div class="sequence-grid" id="stepsGrid"></div>
             </div>
         </div>
@@ -208,7 +211,7 @@
     <div id="leaderboardScreen" class="screen">
         <div class="container">
             <header class="hero small">
-                <h1 class="page-title">🏆 HALL OF FAME</h1>
+                <h1 class="page-title">🏆 HALL OF PILOTS</h1>
             </header>
 
             <div class="leaderboard-filters">
@@ -235,36 +238,36 @@
         <div class="container">
             <div class="game-over-container">
                 <h1 class="game-over-title" id="gameOverTitle">
-                    <span class="title-icon">🎮</span> GAME OVER
+                    <span class="title-icon">👽</span> MISSION FAILED
                 </h1>
 
                 <div class="score-display">
                     <div class="score-ring">
                         <div class="score-ring-inner">
                             <span class="final-score" id="finalScore">0</span>
-                            <span class="score-label">POINTS</span>
+                            <span class="score-label">FUEL</span>
                         </div>
                     </div>
                 </div>
 
                 <div class="final-stats">
                     <div class="final-stat">
-                        <span class="final-stat-icon">🎯</span>
+                        <span class="final-stat-icon">🛸</span>
                         <span class="final-stat-value" id="finalRounds">0</span>
-                        <span class="final-stat-label">Rounds</span>
+                        <span class="final-stat-label">Sequences</span>
                     </div>
                     <div class="final-stat">
                         <span class="final-stat-icon">⚡</span>
                         <span class="final-stat-value" id="finalLevel">Easy</span>
-                        <span class="final-stat-label">Level</span>
+                        <span class="final-stat-label">Difficulty</span>
                     </div>
                 </div>
 
                 <div class="game-over-actions">
                     <button id="playAgainBtn" class="btn btn-play">
-                        <span class="btn-text">🔄 PLAY AGAIN</span>
+                        <span class="btn-text">🔄 TRY AGAIN</span>
                     </button>
-                    <button id="backToMenuBtn" class="btn btn-secondary">🏠 Main Menu</button>
+                    <button id="backToMenuBtn" class="btn btn-secondary">🏠 Base Camp</button>
                 </div>
             </div>
         </div>

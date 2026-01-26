@@ -181,6 +181,31 @@ body {
     color: var(--text-secondary);
 }
 
+.story-intro {
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    color: var(--neon-green);
+    margin-top: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: rgba(0, 255, 136, 0.1);
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    border-radius: var(--radius-md);
+    text-align: center;
+    animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+
+    0%,
+    100% {
+        box-shadow: 0 0 5px rgba(0, 255, 136, 0.3);
+    }
+
+    50% {
+        box-shadow: 0 0 15px rgba(0, 255, 136, 0.5);
+    }
+}
+
 .page-title {
     font-size: 2rem;
     background: linear-gradient(135deg, var(--neon-cyan), var(--neon-magenta));
