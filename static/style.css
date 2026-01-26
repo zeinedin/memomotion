@@ -817,6 +817,17 @@ body {
     pointer-events: none;
 }
 
+/* Tile number styling */
+.tile-number {
+    font-size: 1.5rem;
+    font-weight: 700;
+    z-index: 1;
+}
+
+.tile.pattern .tile-number {
+    color: var(--bg-dark);
+}
+
 /* Hide tile numbers in Classic mode */
 .tile.hide-number .tile-number {
     display: none;
