@@ -450,7 +450,7 @@ function handleGameStarted(data) {
   updateGameUI();
   setMessage(
     '👽',
-    data.message || `Sequence ${data.round} - ZAP is transmitting!`,
+    data.message || `Sequence ${data.round} - BoB is transmitting!`,
   );
 
   // Display pattern
@@ -511,7 +511,7 @@ function handlePatternCorrect(data) {
   gameState.isSelectingPhase = false;
 
   updateGameUI();
-  setMessage('⛽', data.message || 'Fuel collected! ZAP is happy!');
+  setMessage('⛽', data.message || 'Fuel collected! BoB is happy!');
 
   // Flash success on tiles
   clearTileStates();
@@ -540,7 +540,7 @@ function handleGameOver(data) {
   // Set title based on timeout or score - ZAP theme
   if (data.timeout) {
     elements.gameOverTitle.innerHTML =
-      '<span class="title-icon">⏱️</span> TIME\'S UP! ZAP is stranded!';
+      '<span class="title-icon">⏱️</span> TIME\'S UP! BoB is stranded!';
   } else if (gameState.score >= 1000) {
     elements.gameOverTitle.innerHTML =
       '<span class="title-icon">🚀</span> LAUNCH SUCCESS!';
@@ -552,7 +552,7 @@ function handleGameOver(data) {
       '<span class="title-icon">👽</span> GOOD EFFORT!';
   } else if (gameState.score > 0) {
     elements.gameOverTitle.innerHTML =
-      '<span class="title-icon">💫</span> ZAP believes in you!';
+      '<span class="title-icon">💫</span> BoB believes in you!';
   } else {
     elements.gameOverTitle.innerHTML =
       '<span class="title-icon">👽</span> MISSION FAILED';
@@ -577,7 +577,7 @@ function handleGameWon(data) {
     LEVEL_CONFIG[gameState.level]?.label || gameState.level;
 
   elements.gameOverTitle.innerHTML =
-    '<span class="title-icon">🚀</span> ZAP ESCAPED! YOU WIN!';
+    '<span class="title-icon">🚀</span> BoB ESCAPED! YOU WIN!';
 
   showScreen('gameOver');
 }
@@ -795,7 +795,7 @@ function displayPatternSimultaneous(pattern, duration = 5) {
 
   setMessage(
     '👽',
-    `ZAP shows ${pattern.length} tiles! Memorize the launch sequence! (${duration}s)`,
+    `BoB shows ${pattern.length} tiles! Memorize the launch sequence! (${duration}s)`,
   );
 }
 
@@ -915,7 +915,7 @@ async function startGame() {
   buildTileGrid();
 
   showScreen('game');
-  setMessage('👽', 'ZAP is ready! Press START to begin the rescue mission!');
+  setMessage('👽', 'BoB is ready! Press START to begin the rescue mission!');
 }
 
 function showError(msg) {
