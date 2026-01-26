@@ -1,6 +1,7 @@
 """
 Memory XXL Backend - ROBUST VERSION
 Production-ready with proper state machine and error handling
+Version: 2.1 - Fixed speedrun timer timeout
 """
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
