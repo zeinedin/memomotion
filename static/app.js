@@ -295,21 +295,33 @@ function handleMessage(msg) {
     case 'master_status':
     case 'master_connected':
       gameState.masterConnected = data.connected !== false;
-      // If master disconnected, clear all tiles
-      if (!gameState.masterConnected) {
+      // If master disconnected during game, show pause message but don't clear tiles
+      if (!gameState.masterConnected && gameState.isPlaying) {
+        setMessage('⏸️', 'Hub disconnected - waiting for reconnection...');
+        console.log('Master disconnected during game - game paused');
+      } else if (!gameState.masterConnected) {
         gameState.connectedTiles = [];
         console.log('Master disconnected - clearing all tiles');
       }
       updateConnectionUI();
-      updateTileGrid();
+      if (!gameState.isPlaying) {
+        updateTileGrid();
+      }
       break;
 
     case 'master_disconnected':
       gameState.masterConnected = false;
-      gameState.connectedTiles = [];
-      console.log('Master disconnected event - clearing all tiles');
+      // If game is active, show pause message instead of clearing everything
+      if (gameState.isPlaying) {
+        setMessage('⏸️', 'Hub disconnected - waiting for reconnection...');
+        console.log('Master disconnected during game - preserving game state');
+        // Don't clear tiles during active game
+      } else {
+        gameState.connectedTiles = [];
+        console.log('Master disconnected event - clearing all tiles');
+        updateTileGrid();
+      }
       updateConnectionUI();
-      updateTileGrid();
       break;
 
     case 'tile_status':
@@ -608,17 +620,30 @@ function updateConnectionUI() {
     elements.tilesDot?.classList.remove('connected');
   }
 
-  // Update message
-  if (gameState.currentScreen === 'game' && !gameState.isPlaying) {
-    if (gameState.masterConnected && connected > 0) {
-      setMessage(
-        '🎮',
-        `${connected}/${TOTAL_TILES} tiles online! Press START to begin!`,
-      );
-    } else if (!gameState.masterConnected) {
-      setMessage('📡', 'Waiting for Hub to connect...');
-    } else {
-      setMessage('📡', 'Waiting for tiles to connect...');
+  // Update message based on game state
+  if (gameState.currentScreen === 'game') {
+    if (gameState.isPlaying && !gameState.masterConnected) {
+      // Game in progress but master disconnected - show pause message
+      setMessage('⏸️', 'Hub disconnected - waiting for reconnection...');
+    } else if (
+      gameState.isPlaying &&
+      gameState.masterConnected &&
+      connected > 0
+    ) {
+      // Game in progress and master reconnected - show resume message
+      setMessage('▶️', 'Hub reconnected! Continue playing...');
+    } else if (!gameState.isPlaying) {
+      // Not playing - show connection status
+      if (gameState.masterConnected && connected > 0) {
+        setMessage(
+          '🎮',
+          `${connected}/${TOTAL_TILES} tiles online! Press START to begin!`,
+        );
+      } else if (!gameState.masterConnected) {
+        setMessage('📡', 'Waiting for Hub to connect...');
+      } else {
+        setMessage('📡', 'Waiting for tiles to connect...');
+      }
     }
   }
 }

@@ -15,6 +15,7 @@ import json
 import asyncio
 from datetime import datetime
 import random
+import time
 import os
 import uuid
 import logging
@@ -273,14 +274,26 @@ def get_speedrun_time_remaining() -> float:
     if state.game.speedrun_start_time == 0:
         return 0
     
-    elapsed = asyncio.get_event_loop().time() - state.game.speedrun_start_time
+    elapsed = time.time() - state.game.speedrun_start_time
     remaining = state.game.speedrun_time_limit - elapsed
     return max(0, remaining)
 
 async def speedrun_timer_loop():
     """Background task to update speedrun timer and check for timeout"""
+    logger.info("⏱️ Speedrun timer loop started")
     try:
-        while state.game.mode == GameMode.SPEEDRUN and state.game.phase != GamePhase.GAME_OVER:
+        while True:
+            # Exit if game mode changed or game ended
+            if state.game.mode != GameMode.SPEEDRUN:
+                logger.info("⏱️ Timer stopped: mode changed")
+                break
+            if state.game.phase == GamePhase.GAME_OVER:
+                logger.info("⏱️ Timer stopped: game over")
+                break
+            if state.game.phase == GamePhase.IDLE:
+                logger.info("⏱️ Timer stopped: game idle")
+                break
+                
             time_remaining = get_speedrun_time_remaining()
             
             # Broadcast timer update to frontends
@@ -292,15 +305,15 @@ async def speedrun_timer_loop():
                 }
             })
             
-            # Check for timeout
+            # Check for timeout - END THE GAME
             if time_remaining <= 0:
-                logger.info("⏱️ Speedrun time's up!")
+                logger.info("⏱️ Speedrun time's up! Ending game...")
                 await end_game_timeout()
-                break
+                return  # Exit the loop completely
             
-            await asyncio.sleep(0.5)  # Update every 500ms
+            await asyncio.sleep(0.3)  # Update every 300ms for more responsive timer
     except asyncio.CancelledError:
-        pass
+        logger.info("⏱️ Timer cancelled")
     except Exception as e:
         logger.error(f"Speedrun timer error: {e}")
 
@@ -555,10 +568,13 @@ async def start_new_round():
     if state.game.mode == GameMode.SPEEDRUN and state.game.round_number == 1:
         config = SPEEDRUN_CONFIG[state.game.level]
         state.game.speedrun_time_limit = config["time_limit"]
-        state.game.speedrun_start_time = asyncio.get_event_loop().time()
+        state.game.speedrun_start_time = time.time()  # Use time.time() for reliable timing
+        # Cancel any existing timer task
+        if state.game.speedrun_timer_task:
+            state.game.speedrun_timer_task.cancel()
         # Start timer background task
         state.game.speedrun_timer_task = asyncio.create_task(speedrun_timer_loop())
-        logger.info(f"⏱️ Speedrun started: {state.game.speedrun_time_limit}s timer")
+        logger.info(f"⏱️ Speedrun started: {state.game.speedrun_time_limit}s timer at {state.game.speedrun_start_time}")
     
     # Generate pattern
     pattern_length = calculate_pattern_length()
@@ -889,10 +905,20 @@ async def master_websocket(websocket: WebSocket):
         state._last_tile_status = {}  # Force status broadcast
         logger.info("✗ All tiles marked offline (Master disconnected)")
         
-        # Send master_disconnected event
+        # Check if game was in progress - preserve game state but notify frontend
+        game_was_active = state.game.phase not in [GamePhase.IDLE, GamePhase.GAME_OVER]
+        
+        # Send master_disconnected event with game state info
         await broadcast_to_frontends({
             "event": "master_disconnected",
-            "data": {"connected": False}
+            "data": {
+                "connected": False,
+                "game_paused": game_was_active,
+                "game_phase": state.game.phase.value,
+                "team_name": state.game.team_name,
+                "round": state.game.round_number,
+                "score": state.game.score
+            }
         })
         
         # Also send master_status for compatibility
