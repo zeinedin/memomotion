@@ -155,20 +155,20 @@ function setupEventListeners() {
     });
   });
 
-  // Buttons
-  elements.startGameBtn.addEventListener('click', startGame);
-  elements.viewLeaderboardBtn.addEventListener('click', () =>
+  // Buttons - with null checks
+  elements.startGameBtn?.addEventListener('click', startGame);
+  elements.viewLeaderboardBtn?.addEventListener('click', () =>
     showScreen('leaderboard'),
   );
-  elements.backToStartBtn.addEventListener('click', confirmExit);
-  elements.backFromLeaderboardBtn.addEventListener('click', () =>
+  elements.backToStartBtn?.addEventListener('click', confirmExit);
+  elements.backFromLeaderboardBtn?.addEventListener('click', () =>
     showScreen('start'),
   );
-  elements.playAgainBtn.addEventListener('click', playAgain);
-  elements.backToMenuBtn.addEventListener('click', () => showScreen('start'));
+  elements.playAgainBtn?.addEventListener('click', playAgain);
+  elements.backToMenuBtn?.addEventListener('click', () => showScreen('start'));
 
   // Enter key
-  elements.teamNameInput.addEventListener('keypress', (e) => {
+  elements.teamNameInput?.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') startGame();
   });
 
@@ -199,6 +199,15 @@ function showScreen(screen) {
 
   if (screen === 'leaderboard') {
     loadFullLeaderboard();
+  }
+
+  // Refresh leaderboard preview when returning to start screen
+  if (screen === 'start') {
+    loadLeaderboard();
+    // Clear any error messages
+    if (elements.teamNameError) {
+      elements.teamNameError.style.display = 'none';
+    }
   }
 }
 
@@ -360,6 +369,13 @@ function handleMessage(msg) {
       handleSpeedrunTimer(data);
       break;
 
+    case 'game_reset':
+      // Admin triggered reset - return to start screen
+      resetGameState();
+      showScreen('start');
+      setMessage('🔄', 'Game reset by admin');
+      break;
+
     case 'error':
       setMessage('❌', data.message || 'Error');
       break;
@@ -491,7 +507,7 @@ function handlePatternCorrect(data) {
   clearTileStates();
 
   setTimeout(() => {
-    elements.stepsSection.classList.remove('visible');
+    elements.stepsSection?.classList.remove('visible');
   }, 1500);
 }
 
@@ -566,7 +582,7 @@ function showSpeedrunTimer(show) {
 }
 
 function updateSpeedrunTimer(timeRemaining, timeLimit) {
-  if (!elements.timerValue || !elements.timerBar) return;
+  if (!elements.timerValue || !elements.timerBar || !elements.timerBox) return;
 
   // Update timer value
   const seconds = Math.ceil(timeRemaining);
@@ -903,12 +919,17 @@ function resetGameState() {
 
 function playAgain() {
   resetGameState();
+  gameState.scoreSubmitted = false; // Reset so new score can be saved
   sendMessage({
     type: 'start_game',
     team_name: gameState.teamName,
     level: gameState.level,
     mode: gameState.mode,
   });
+
+  // Rebuild tile grid with mode-specific settings
+  buildTileGrid();
+
   showScreen('game');
 }
 

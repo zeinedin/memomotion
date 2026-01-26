@@ -719,6 +719,18 @@ async def handle_tile_step(tile_id: int, is_on: bool):
             state.game.player_sequence.append(tile_id)
             state.game.selected_tiles.add(tile_id)
             
+            # Send tile toggle event for Simon mode too
+            await broadcast_to_frontends({
+                "event": "tile_toggled",
+                "data": {
+                    "tile_id": tile_id,
+                    "is_selected": True,
+                    "selected_tiles": list(state.game.selected_tiles),
+                    "total_selected": len(state.game.player_sequence),
+                    "expected_count": len(state.game.pattern)
+                }
+            })
+            
             # Check if sequence matches so far
             idx = len(state.game.player_sequence) - 1
             if idx < len(state.game.pattern):
@@ -865,6 +877,7 @@ async def end_game_win():
             "rounds": state.game.round_number,
             "team_name": state.game.team_name,
             "level": state.game.level,
+            "mode": state.game.mode.value,
             "bonus_points": bonus_points
         }
     })
@@ -917,6 +930,7 @@ async def end_game_wrong():
             "rounds": state.game.round_number,
             "team_name": state.game.team_name,
             "level": state.game.level,
+            "mode": state.game.mode.value,
             "penalty_applied": WRONG_PENALTY
         }
     })
