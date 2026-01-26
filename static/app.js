@@ -29,8 +29,8 @@ const MODE_CONFIG = {
 };
 
 const LEVEL_CONFIG = {
-  easy: { label: 'Easy', steps: 3, multiplier: 1 },
-  medium: { label: 'Medium', steps: 4, multiplier: 2 },
+  easy: { label: 'Easy', steps: 1, multiplier: 1 },
+  medium: { label: 'Medium', steps: 3, multiplier: 2 },
   hard: { label: 'Hard', steps: 5, multiplier: 3 },
 };
 

@@ -47,9 +47,9 @@ class GameMode(str, Enum):
 
 # Level configurations
 LEVEL_CONFIG = {
-    "easy": {"base_pattern": 3, "multiplier": 1, "base_points": 20, "show_time": 5},
-    "medium": {"base_pattern": 4, "multiplier": 2, "base_points": 30, "show_time": 6},
-    "hard": {"base_pattern": 5, "multiplier": 3, "base_points": 50, "show_time": 8}
+    "easy": {"base_pattern": 1, "multiplier": 1, "base_points": 20, "show_time":8},
+    "medium": {"base_pattern": 3, "multiplier": 2, "base_points": 30, "show_time": 6},
+    "hard": {"base_pattern": 5, "multiplier": 3, "base_points": 50, "show_time": 4}
 }
 
 WRONG_PENALTY = 15
@@ -204,8 +204,26 @@ def calculate_pattern_length() -> int:
     elif state.game.mode == GameMode.ENDLESS:
         # Endless: starts at 2, grows each round
         return min(1 + state.game.round_number, max_tiles)
+    elif state.game.mode == GameMode.CLASSIC:
+        # Classic: progressive difficulty with increasing plateau lengths
+        # Round 1: base (1 round at this level)
+        # Rounds 2-3: base+1 (2 rounds at this level)
+        # Rounds 4-6: base+2 (3 rounds at this level)
+        # Rounds 7-10: base+3 (4 rounds at this level)
+        # etc. - each level lasts one round longer than the previous
+        # Win condition: when pattern reaches 10 tiles, player wins!
+        import math
+        round_num = state.game.round_number
+        
+        # Calculate level using triangular number formula
+        # Level n starts at round: 1 + n(n+1)/2
+        # Given round R, level = floor((-1 + sqrt(1 + 8*(R-1))) / 2)
+        level = int((-1 + math.sqrt(1 + 8 * (round_num - 1))) / 2)
+        pattern_length = base + level
+        
+        return min(pattern_length, max_tiles)
     else:
-        # Classic/Speedrun: starts at base, adds 1 tile per round (progressive difficulty)
+        # Speedrun: starts at base, adds 1 tile per round (progressive difficulty)
         # Round 1: base tiles, Round 2: base+1, Round 3: base+2, etc.
         pattern_length = base + (state.game.round_number - 1)
         return min(pattern_length, max_tiles)
@@ -432,6 +450,12 @@ async def start_new_round():
     
     # Generate pattern
     pattern_length = calculate_pattern_length()
+    
+    # WIN CONDITION: If pattern would reach 10 tiles in Classic mode, player wins!
+    if state.game.mode == GameMode.CLASSIC and pattern_length >= 10:
+        await end_game_win()
+        return True
+    
     state.game.pattern = random.sample(connected, min(pattern_length, len(connected)))
     
     logger.info(f"Round {state.game.round_number}: Pattern {state.game.pattern} (length={len(state.game.pattern)}, mode={state.game.mode.value})")
@@ -592,6 +616,45 @@ async def handle_correct_pattern():
     # Start next round automatically
     await asyncio.sleep(1)
     await start_new_round()
+
+async def end_game_win():
+    """End game - PLAYER WINS! Reached 10 tile pattern"""
+    state.game.phase = GamePhase.GAME_OVER
+    state.games_played += 1
+    
+    # Bonus points for winning!
+    bonus_points = 100
+    state.game.score += bonus_points
+    
+    if state.game.score > state.high_score:
+        state.high_score = state.game.score
+    
+    logger.info(f"🏆 WINNER! Final score: {state.game.score} (includes {bonus_points} bonus)")
+    
+    # Tell master to celebrate (flash all tiles green)
+    await send_to_master({"event": "game_won", "data": {}})
+    await asyncio.sleep(0.2)
+    await send_to_master({"event": "pattern_correct", "data": {}})  # Flash green
+    
+    # Save score
+    await save_score()
+    
+    await broadcast_to_frontends({
+        "event": "game_won",
+        "data": {
+            "message": "🏆 GEFELICITEERD! Je hebt gewonnen!",
+            "final_score": state.game.score,
+            "rounds": state.game.round_number,
+            "team_name": state.game.team_name,
+            "level": state.game.level,
+            "bonus_points": bonus_points
+        }
+    })
+    
+    # Reset game state after delay
+    await asyncio.sleep(3)
+    await send_to_master({"event": "clear_tiles", "data": {}})
+    state.game.phase = GamePhase.IDLE
 
 async def end_game_wrong():
     """End game due to wrong selection"""
