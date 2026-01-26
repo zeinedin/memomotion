@@ -1204,22 +1204,42 @@ async def handle_frontend_message(msg: dict, websocket: WebSocket):
     data = msg.get("data", {}) or msg
     
     if event == "start_game":
-        # Register new game
-        state.game.reset()
-        state.game.team_name = data.get("team_name", "Team")
-        state.game.level = data.get("level", "easy")
-        
+        # Register new game - reset game progress but set team info first
+        team_name = data.get("team_name", "Team")
+        level = data.get("level", "easy")
         mode_str = data.get("mode", "classic")
+        
+        # Cancel any existing speedrun timer before reset
+        if state.game.speedrun_timer_task:
+            state.game.speedrun_timer_task.cancel()
+            state.game.speedrun_timer_task = None
+        
+        # Reset game progress (but keep team info we're about to set)
+        state.game.score = 0
+        state.game.round_number = 0
+        state.game.pattern = []
+        state.game.player_sequence = []
+        state.game.selected_tiles = set()
+        state.game.score_submitted = False
+        state.game.phase_start_time = 0
+        state.game.speedrun_start_time = 0
+        state.game.speedrun_time_limit = 0
+        
+        # Set team info
+        state.game.team_name = team_name
+        state.game.level = level
         try:
             state.game.mode = GameMode(mode_str)
         except ValueError:
             state.game.mode = GameMode.CLASSIC
         
+        # Set phase LAST to ensure all data is ready
         state.game.phase = GamePhase.REGISTERED
         
         logger.info(f"→ Game registered: {state.game.team_name} ({state.game.level}, {state.game.mode.value})")
         
-        await websocket.send_json({
+        # Broadcast to ALL frontends, not just the one that sent the message
+        await broadcast_to_frontends({
             "event": "game_registered",
             "data": {
                 "team_name": state.game.team_name,
