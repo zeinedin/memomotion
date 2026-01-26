@@ -1303,33 +1303,44 @@ async def get_config():
 @app.post("/api/admin/config/levels")
 async def save_level_config(config: dict):
     """Save level configuration - updates both admin_config and LEVEL_CONFIG"""
-    global LEVEL_CONFIG
     try:
+        logger.info(f"Received level config to save: {config}")
+        
+        # Extract values with defaults
+        easy_steps = int(config.get("easy", {}).get("steps", 1))
+        easy_points = int(config.get("easy", {}).get("points", 20))
+        medium_steps = int(config.get("medium", {}).get("steps", 3))
+        medium_points = int(config.get("medium", {}).get("points", 30))
+        hard_steps = int(config.get("hard", {}).get("steps", 5))
+        hard_points = int(config.get("hard", {}).get("points", 50))
+        
+        # Update admin_config
         admin_config["levels"] = {
-            "easy": {
-                "steps": config.get("easy", {}).get("steps", 4),
-                "points": config.get("easy", {}).get("points", 10)
-            },
-            "medium": {
-                "steps": config.get("medium", {}).get("steps", 6),
-                "points": config.get("medium", {}).get("points", 15)
-            },
-            "hard": {
-                "steps": config.get("hard", {}).get("steps", 8),
-                "points": config.get("hard", {}).get("points", 25)
-            }
+            "easy": {"steps": easy_steps, "points": easy_points},
+            "medium": {"steps": medium_steps, "points": medium_points},
+            "hard": {"steps": hard_steps, "points": hard_points}
         }
         
-        # Also update LEVEL_CONFIG to apply changes to the game
-        LEVEL_CONFIG["easy"]["base_pattern"] = admin_config["levels"]["easy"]["steps"]
-        LEVEL_CONFIG["easy"]["base_points"] = admin_config["levels"]["easy"]["points"]
-        LEVEL_CONFIG["medium"]["base_pattern"] = admin_config["levels"]["medium"]["steps"]
-        LEVEL_CONFIG["medium"]["base_points"] = admin_config["levels"]["medium"]["points"]
-        LEVEL_CONFIG["hard"]["base_pattern"] = admin_config["levels"]["hard"]["steps"]
-        LEVEL_CONFIG["hard"]["base_points"] = admin_config["levels"]["hard"]["points"]
+        # Update LEVEL_CONFIG to apply changes to the game
+        LEVEL_CONFIG["easy"]["base_pattern"] = easy_steps
+        LEVEL_CONFIG["easy"]["base_points"] = easy_points
+        LEVEL_CONFIG["medium"]["base_pattern"] = medium_steps
+        LEVEL_CONFIG["medium"]["base_points"] = medium_points
+        LEVEL_CONFIG["hard"]["base_pattern"] = hard_steps
+        LEVEL_CONFIG["hard"]["base_points"] = hard_points
         
-        logger.info(f"Level config updated: {admin_config['levels']}")
-        return {"status": "ok", "config": admin_config["levels"]}
+        logger.info(f"✓ Level config SAVED - Easy: {easy_steps} steps/{easy_points} pts, Medium: {medium_steps} steps/{medium_points} pts, Hard: {hard_steps} steps/{hard_points} pts")
+        logger.info(f"✓ LEVEL_CONFIG now: {LEVEL_CONFIG}")
+        
+        return {
+            "status": "ok", 
+            "config": admin_config["levels"],
+            "applied": {
+                "easy": {"base_pattern": LEVEL_CONFIG["easy"]["base_pattern"], "base_points": LEVEL_CONFIG["easy"]["base_points"]},
+                "medium": {"base_pattern": LEVEL_CONFIG["medium"]["base_pattern"], "base_points": LEVEL_CONFIG["medium"]["base_points"]},
+                "hard": {"base_pattern": LEVEL_CONFIG["hard"]["base_pattern"], "base_points": LEVEL_CONFIG["hard"]["base_points"]}
+            }
+        }
     except Exception as e:
         logger.error(f"Failed to save level config: {e}")
         return {"status": "error", "message": str(e)}
@@ -1337,18 +1348,24 @@ async def save_level_config(config: dict):
 @app.post("/api/admin/config/speedrun")
 async def save_speedrun_config(config: dict):
     """Save speed run configuration - updates both admin_config and SPEEDRUN_CONFIG"""
-    global SPEEDRUN_CONFIG
     try:
+        logger.info(f"Received speedrun config to save: {config}")
+        
+        time_per_step = int(config.get("timePerStep", 3))
+        bonus_per_second = int(config.get("bonusPerSecond", 2))
+        
         admin_config["speedRun"] = {
-            "timePerStep": config.get("timePerStep", 3),
-            "bonusPerSecond": config.get("bonusPerSecond", 2)
+            "timePerStep": time_per_step,
+            "bonusPerSecond": bonus_per_second
         }
         
-        # Also update SPEEDRUN_CONFIG to apply changes to the game
+        # Update SPEEDRUN_CONFIG to apply changes to the game
         for level in ["easy", "medium", "hard"]:
-            SPEEDRUN_CONFIG[level]["time_bonus_per_second"] = admin_config["speedRun"]["bonusPerSecond"]
+            SPEEDRUN_CONFIG[level]["time_bonus_per_second"] = bonus_per_second
         
-        logger.info(f"Speed run config updated: {admin_config['speedRun']}")
+        logger.info(f"✓ Speedrun config SAVED - timePerStep: {time_per_step}, bonusPerSecond: {bonus_per_second}")
+        logger.info(f"✓ SPEEDRUN_CONFIG now: {SPEEDRUN_CONFIG}")
+        
         return {"status": "ok", "config": admin_config["speedRun"]}
     except Exception as e:
         logger.error(f"Failed to save speed run config: {e}")

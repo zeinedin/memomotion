@@ -693,16 +693,16 @@
         async function saveConfig() {
             var config = {
                 easy: {
-                    steps: parseInt(document.getElementById('easySteps').value) || 4,
-                    points: parseInt(document.getElementById('easyPoints').value) || 10
+                    steps: parseInt(document.getElementById('easySteps').value) || 1,
+                    points: parseInt(document.getElementById('easyPoints').value) || 20
                 },
                 medium: {
-                    steps: parseInt(document.getElementById('mediumSteps').value) || 6,
-                    points: parseInt(document.getElementById('mediumPoints').value) || 15
+                    steps: parseInt(document.getElementById('mediumSteps').value) || 3,
+                    points: parseInt(document.getElementById('mediumPoints').value) || 30
                 },
                 hard: {
-                    steps: parseInt(document.getElementById('hardSteps').value) || 8,
-                    points: parseInt(document.getElementById('hardPoints').value) || 25
+                    steps: parseInt(document.getElementById('hardSteps').value) || 5,
+                    points: parseInt(document.getElementById('hardPoints').value) || 50
                 }
             };
 
@@ -713,11 +713,16 @@
                     body: JSON.stringify(config)
                 });
 
-                if (response.ok) {
+                var result = await response.json();
+                console.log('Save result:', result);
+
+                if (response.ok && result.status === 'ok') {
                     showToast('Level configuratie opgeslagen!');
                     addLog('Level configuratie gewijzigd', 'success');
+                    // Reload config to confirm
+                    await loadConfig();
                 } else {
-                    showToast('Fout bij opslaan', true);
+                    showToast('Fout bij opslaan: ' + (result.message || 'Unknown error'), true);
                 }
             } catch (error) {
                 showToast('Fout bij opslaan', true);
@@ -739,11 +744,16 @@
                     body: JSON.stringify(config)
                 });
 
-                if (response.ok) {
+                var result = await response.json();
+                console.log('Save speedrun result:', result);
+
+                if (response.ok && result.status === 'ok') {
                     showToast('Speed Run instellingen opgeslagen!');
                     addLog('Speed Run configuratie gewijzigd', 'success');
+                    // Reload config to confirm
+                    await loadConfig();
                 } else {
-                    showToast('Fout bij opslaan', true);
+                    showToast('Fout bij opslaan: ' + (result.message || 'Unknown error'), true);
                 }
             } catch (error) {
                 showToast('Fout bij opslaan', true);
