@@ -520,7 +520,7 @@ function handlePatternCorrect(data) {
 
 function handleGameOver(data) {
   console.log('🎮 handleGameOver called:', data);
-  
+
   gameState.isPlaying = false;
   gameState.isSelectingPhase = false;
   gameState.isSpeedrun = false;
@@ -591,7 +591,7 @@ function handleSpeedrunTimer(data) {
       timeout: true,
       final_score: gameState.score,
       rounds: gameState.round,
-      mode: 'speedrun'
+      mode: 'speedrun',
     });
   }
 }
