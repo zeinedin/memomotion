@@ -714,7 +714,6 @@
                 });
 
                 var result = await response.json();
-                console.log('Save result:', result);
 
                 if (response.ok && result.status === 'ok') {
                     showToast('Level configuratie opgeslagen!');
@@ -745,7 +744,6 @@
                 });
 
                 var result = await response.json();
-                console.log('Save speedrun result:', result);
 
                 if (response.ok && result.status === 'ok') {
                     showToast('Speed Run instellingen opgeslagen!');
@@ -855,13 +853,11 @@
             }
 
             try {
-                console.log('Clearing all leaderboard...');
                 var response = await fetch('/api/leaderboard', {
                     method: 'DELETE'
                 });
 
                 var data = await response.json();
-                console.log('Clear response:', data);
 
                 if (response.ok || data.status === 'ok') {
                     showToast(data.message || 'Leaderboard gewist!');
@@ -885,13 +881,11 @@
             }
 
             try {
-                console.log('Deleting score:', id, teamName);
                 var response = await fetch('/api/admin/leaderboard/' + encodeURIComponent(id), {
                     method: 'DELETE'
                 });
 
                 var data = await response.json();
-                console.log('Delete response:', data);
 
                 if (response.ok || data.status === 'ok') {
                     showToast('Score verwijderd!');

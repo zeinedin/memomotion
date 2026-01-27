@@ -227,20 +227,16 @@ function connectWebSocket() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${protocol}//${window.location.host}/ws/frontend`;
 
-  console.log('🔌 Connecting:', wsUrl);
-
   try {
     gameState.socket = new WebSocket(wsUrl);
 
     gameState.socket.onopen = () => {
-      console.log('✓ WebSocket connected');
       gameState.isConnected = true;
       gameState.reconnectAttempts = 0;
       updateConnectionUI();
     };
 
     gameState.socket.onclose = () => {
-      console.log('✗ WebSocket closed');
       gameState.isConnected = false;
       gameState.masterConnected = false;
       updateConnectionUI();
@@ -272,9 +268,6 @@ function attemptReconnect() {
       RECONNECT_BASE_DELAY * Math.pow(2, gameState.reconnectAttempts - 1),
       30000,
     );
-    console.log(
-      `🔄 Reconnecting in ${delay}ms (${gameState.reconnectAttempts}/${RECONNECT_MAX_ATTEMPTS})`,
-    );
     setTimeout(connectWebSocket, delay);
   }
 }
@@ -290,11 +283,6 @@ function handleMessage(msg) {
   const event = msg.event || msg.type;
   const data = msg.data || msg;
 
-  // Reduce logging for frequent events
-  if (event !== 'tile_status') {
-    console.log('📩', event, data);
-  }
-
   switch (event) {
     case 'initial_state':
     case 'state_update':
@@ -307,10 +295,8 @@ function handleMessage(msg) {
       // If master disconnected during game, show pause message but don't clear tiles
       if (!gameState.masterConnected && gameState.isPlaying) {
         setMessage('⏸️', 'Hub disconnected - waiting for reconnection...');
-        console.log('Master disconnected during game - game paused');
       } else if (!gameState.masterConnected) {
         gameState.connectedTiles = [];
-        console.log('Master disconnected - clearing all tiles');
       }
       updateConnectionUI();
       if (!gameState.isPlaying) {
@@ -323,11 +309,8 @@ function handleMessage(msg) {
       // If game is active, show pause message instead of clearing everything
       if (gameState.isPlaying) {
         setMessage('⏸️', 'Hub disconnected - waiting for reconnection...');
-        console.log('Master disconnected during game - preserving game state');
-        // Don't clear tiles during active game
       } else {
         gameState.connectedTiles = [];
-        console.log('Master disconnected event - clearing all tiles');
         updateTileGrid();
       }
       updateConnectionUI();
@@ -522,8 +505,6 @@ function handlePatternCorrect(data) {
 }
 
 function handleGameOver(data) {
-  console.log('🎮 handleGameOver called:', data);
-
   gameState.isPlaying = false;
   gameState.isSelectingPhase = false;
   gameState.isSpeedrun = false;
@@ -558,7 +539,6 @@ function handleGameOver(data) {
       '<span class="title-icon">👽</span> MISSION FAILED';
   }
 
-  console.log('🎮 Showing gameOver screen');
   showScreen('gameOver');
 }
 
@@ -592,7 +572,6 @@ function handleSpeedrunTimer(data) {
 
   // Client-side safeguard: if time reaches 0, show game over
   if (data.time_remaining <= 0 && gameState.isPlaying) {
-    console.log('⏱️ Timer reached 0 - triggering game over');
     handleGameOver({
       timeout: true,
       final_score: gameState.score,
