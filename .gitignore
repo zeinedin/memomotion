@@ -78,3 +78,13 @@ Desktop.ini
 .piolibdeps/
 *.bin
 *.elf
+
+# ==========================
+# LARGE FILES
+# ==========================
+Logos/
+3D files/
+*.pptx
+*.pdf
+*.eps
+*.ai
