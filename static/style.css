@@ -1134,25 +1134,23 @@ body {
    FOOTER
    ============================================ */
 .site-footer {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: var(--space-md) var(--space-lg);
-    background: linear-gradient(to top, rgba(10, 10, 26, 0.95), transparent);
+    width: 100%;
+    padding: var(--space-xl) var(--space-lg);
+    margin-top: var(--space-xl);
+    background: rgba(10, 10, 26, 0.8);
+    border-top: 1px solid var(--card-border);
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--space-sm);
-    z-index: 100;
-    pointer-events: none;
+    gap: var(--space-md);
 }
 
 .footer-logos {
     display: flex;
     align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
     gap: var(--space-xl);
-    pointer-events: auto;
 }
 
 .footer-logo {
