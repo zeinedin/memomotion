@@ -807,6 +807,9 @@ async def validate_selection():
     
     state.game.phase = GamePhase.VALIDATING
     
+    # IMMEDIATELY clear all tile LEDs when validation starts
+    await send_to_master({"event": "clear_tiles", "data": {}})
+    
     pattern_set = set(state.game.pattern)
     
     # Check based on mode
