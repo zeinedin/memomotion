@@ -423,16 +423,7 @@ async def read_tilehub_css():
 
 @app.get("/favicon.ico")
 async def favicon():
-    if os.path.exists("static/favicon.ico"):
-        return FileResponse("static/favicon.ico", media_type="image/x-icon")
     return Response(status_code=204)
-
-@app.get("/logos/{filename}")
-async def get_logo(filename: str):
-    filepath = f"static/logos/{filename}"
-    if os.path.exists(filepath):
-        return FileResponse(filepath)
-    return Response(status_code=404)
 
 @app.get("/status")
 async def get_status():
