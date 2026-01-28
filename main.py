@@ -798,11 +798,17 @@ async def validate_selection():
     
     state.game.phase = GamePhase.VALIDATING
     
-    # IMMEDIATELY clear all tile LEDs when validation starts (send multiple times for reliability)
-    logger.info("🔌 Clearing all tile LEDs...")
+    # IMMEDIATELY lock tiles and clear all LEDs (send multiple times for reliability)
+    logger.info("🔒 Locking and clearing all tiles...")
+    
+    # Send game_over event which sets gameActive=false on master, preventing tile interactions
+    await send_to_master({"event": "game_over", "data": {}})
+    await asyncio.sleep(0.05)
+    
+    # Then clear tiles multiple times
     for _ in range(3):
         await send_to_master({"event": "clear_tiles", "data": {}})
-        await asyncio.sleep(0.05)  # 50ms between sends
+        await asyncio.sleep(0.05)
     
     pattern_set = set(state.game.pattern)
     
