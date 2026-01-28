@@ -423,16 +423,7 @@ async def read_tilehub_css():
 
 @app.get("/favicon.ico")
 async def favicon():
-    if os.path.exists("static/favicon.ico"):
-        return FileResponse("static/favicon.ico", media_type="image/x-icon")
     return Response(status_code=204)
-
-@app.get("/logos/{filename}")
-async def get_logo(filename: str):
-    filepath = f"static/logos/{filename}"
-    if os.path.exists(filepath):
-        return FileResponse(filepath)
-    return Response(status_code=404)
 
 @app.get("/status")
 async def get_status():
@@ -807,17 +798,11 @@ async def validate_selection():
     
     state.game.phase = GamePhase.VALIDATING
     
-    # IMMEDIATELY lock tiles and clear all LEDs (send multiple times for reliability)
-    logger.info("🔒 Locking and clearing all tiles...")
-    
-    # Send game_over event which sets gameActive=false on master, preventing tile interactions
-    await send_to_master({"event": "game_over", "data": {}})
-    await asyncio.sleep(0.05)
-    
-    # Then clear tiles multiple times
+    # IMMEDIATELY clear all tile LEDs when validation starts (send multiple times for reliability)
+    logger.info("🔌 Clearing all tile LEDs...")
     for _ in range(3):
         await send_to_master({"event": "clear_tiles", "data": {}})
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.05)  # 50ms between sends
     
     pattern_set = set(state.game.pattern)
     
