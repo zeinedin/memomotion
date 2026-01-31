@@ -52,28 +52,28 @@
                 <div class="form-group">
                     <label><span class="label-icon">🚀</span> Mission Type</label>
                     <div class="mode-selector">
-                        <button class="mode-btn active" data-mode="classic">
+                        <button class="mode-btn active" data-mode="classic" aria-pressed="true">
                             <span class="mode-icon">🛸</span>
                             <div class="mode-info">
                                 <span class="mode-name">CLASSIC</span>
                                 <span class="mode-desc">Standard launch sequence</span>
                             </div>
                         </button>
-                        <button class="mode-btn" data-mode="simon">
+                        <button class="mode-btn" data-mode="simon" aria-pressed="false">
                             <span class="mode-icon">🎯</span>
                             <div class="mode-info">
                                 <span class="mode-name">SIMON SAYS</span>
                                 <span class="mode-desc">Exact sequence</span>
                             </div>
                         </button>
-                        <button class="mode-btn disabled" data-mode="endless" disabled>
+                        <button class="mode-btn disabled" data-mode="endless" disabled aria-pressed="false">
                             <span class="mode-icon">♾️</span>
                             <div class="mode-info">
                                 <span class="mode-name">ENDLESS</span>
                                 <span class="mode-desc">Coming Soon</span>
                             </div>
                         </button>
-                        <button class="mode-btn" data-mode="speedrun">
+                        <button class="mode-btn" data-mode="speedrun" aria-pressed="false">
                             <span class="mode-icon">⚡</span>
                             <div class="mode-info">
                                 <span class="mode-name">EMERGENCY</span>
@@ -86,7 +86,7 @@
                 <div class="form-group">
                     <label><span class="label-icon">⚡</span> Difficulty</label>
                     <div class="level-selector">
-                        <button class="level-btn active" data-level="easy">
+                        <button class="level-btn active" data-level="easy" aria-pressed="true">
                             <span class="level-icon">🌟</span>
                             <div class="level-info">
                                 <span class="level-name">EASY</span>
@@ -94,7 +94,7 @@
                             </div>
                             <span class="level-multiplier">1x</span>
                         </button>
-                        <button class="level-btn" data-level="medium">
+                        <button class="level-btn" data-level="medium" aria-pressed="false">
                             <span class="level-icon">🔥</span>
                             <div class="level-info">
                                 <span class="level-name">MEDIUM</span>
@@ -102,7 +102,7 @@
                             </div>
                             <span class="level-multiplier">2x</span>
                         </button>
-                        <button class="level-btn" data-level="hard">
+                        <button class="level-btn" data-level="hard" aria-pressed="false">
                             <span class="level-icon">💀</span>
                             <div class="level-info">
                                 <span class="level-name">HARD</span>
@@ -146,7 +146,7 @@
                         </span>
                     </div>
                 </div>
-                <button id="backToStartBtn" class="btn btn-icon">✕</button>
+                <button id="backToStartBtn" class="btn btn-icon" aria-label="Exit Game">✕</button>
             </header>
 
             <div class="game-stats">
@@ -215,10 +215,10 @@
             </header>
 
             <div class="leaderboard-filters">
-                <button class="filter-btn active" data-level="all">All</button>
-                <button class="filter-btn" data-level="easy">Easy</button>
-                <button class="filter-btn" data-level="medium">Medium</button>
-                <button class="filter-btn" data-level="hard">Hard</button>
+                <button class="filter-btn active" data-level="all" aria-pressed="true">All</button>
+                <button class="filter-btn" data-level="easy" aria-pressed="false">Easy</button>
+                <button class="filter-btn" data-level="medium" aria-pressed="false">Medium</button>
+                <button class="filter-btn" data-level="hard" aria-pressed="false">Hard</button>
             </div>
 
             <div class="card glass-card">
