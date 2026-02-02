@@ -847,6 +847,16 @@ async function startGame() {
     return;
   }
 
+  // Set loading state
+  const btn = elements.startGameBtn;
+  const originalContent = btn ? btn.innerHTML : '';
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML =
+      '<div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div> Checking...';
+  }
+
   // Check for duplicate name
   try {
     const res = await fetch(
@@ -855,10 +865,20 @@ async function startGame() {
     const data = await res.json();
     if (data.exists) {
       showError('Team name already taken!');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
+      }
       return;
     }
   } catch (e) {
     console.warn('Name check failed:', e);
+  }
+
+  // Restore button state
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = originalContent;
   }
 
   // Setup game state
