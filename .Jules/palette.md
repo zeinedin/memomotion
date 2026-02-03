@@ -1,0 +1,3 @@
+## 2024-10-26 - Custom Button Groups & ARIA State
+**Learning:** The application uses custom `div` or `button` groups (like Mode and Level selectors) styled as toggles but relies solely on CSS classes (`.active`) for state. This makes the selected state invisible to screen readers.
+**Action:** When using custom toggle groups, always implement `aria-pressed` (for toggles) or `role="radiogroup"` + `aria-checked` (for single-select options). For this implementation, we'll use `aria-pressed` on buttons within a `role="group"` as they function as toggle-style buttons in the UI, even if mutually exclusive in logic.
