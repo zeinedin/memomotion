@@ -34,13 +34,13 @@
 
             <div class="card glass-card">
                 <div class="card-header">
-                    <span class="card-icon">👽</span>
+                    <span class="card-icon" aria-hidden="true">👽</span>
                     <h2>Rescue Team Setup</h2>
                 </div>
 
                 <div class="form-group">
                     <label for="teamName">
-                        <span class="label-icon">🏷️</span> Crew Name
+                        <span class="label-icon" aria-hidden="true">🏷️</span> Crew Name
                     </label>
                     <div class="input-wrapper">
                         <input type="text" id="teamName" placeholder="Enter your crew name..." maxlength="20"
@@ -50,31 +50,31 @@
                 </div>
 
                 <div class="form-group">
-                    <label><span class="label-icon">🚀</span> Mission Type</label>
-                    <div class="mode-selector">
-                        <button class="mode-btn active" data-mode="classic">
-                            <span class="mode-icon">🛸</span>
+                    <label><span class="label-icon" aria-hidden="true">🚀</span> Mission Type</label>
+                    <div class="mode-selector" role="group" aria-label="Game Mode">
+                        <button class="mode-btn active" data-mode="classic" aria-pressed="true">
+                            <span class="mode-icon" aria-hidden="true">🛸</span>
                             <div class="mode-info">
                                 <span class="mode-name">CLASSIC</span>
                                 <span class="mode-desc">Standard launch sequence</span>
                             </div>
                         </button>
-                        <button class="mode-btn" data-mode="simon">
-                            <span class="mode-icon">🎯</span>
+                        <button class="mode-btn" data-mode="simon" aria-pressed="false">
+                            <span class="mode-icon" aria-hidden="true">🎯</span>
                             <div class="mode-info">
                                 <span class="mode-name">SIMON SAYS</span>
                                 <span class="mode-desc">Exact sequence</span>
                             </div>
                         </button>
-                        <button class="mode-btn disabled" data-mode="endless" disabled>
-                            <span class="mode-icon">♾️</span>
+                        <button class="mode-btn disabled" data-mode="endless" disabled aria-pressed="false">
+                            <span class="mode-icon" aria-hidden="true">♾️</span>
                             <div class="mode-info">
                                 <span class="mode-name">ENDLESS</span>
                                 <span class="mode-desc">Coming Soon</span>
                             </div>
                         </button>
-                        <button class="mode-btn" data-mode="speedrun">
-                            <span class="mode-icon">⚡</span>
+                        <button class="mode-btn" data-mode="speedrun" aria-pressed="false">
+                            <span class="mode-icon" aria-hidden="true">⚡</span>
                             <div class="mode-info">
                                 <span class="mode-name">EMERGENCY</span>
                                 <span class="mode-desc">Race against time!</span>
@@ -84,26 +84,26 @@
                 </div>
 
                 <div class="form-group">
-                    <label><span class="label-icon">⚡</span> Difficulty</label>
-                    <div class="level-selector">
-                        <button class="level-btn active" data-level="easy">
-                            <span class="level-icon">🌟</span>
+                    <label><span class="label-icon" aria-hidden="true">⚡</span> Difficulty</label>
+                    <div class="level-selector" role="group" aria-label="Difficulty Level">
+                        <button class="level-btn active" data-level="easy" aria-pressed="true">
+                            <span class="level-icon" aria-hidden="true">🌟</span>
                             <div class="level-info">
                                 <span class="level-name">EASY</span>
                                 <span class="level-desc">3 Tiles</span>
                             </div>
                             <span class="level-multiplier">1x</span>
                         </button>
-                        <button class="level-btn" data-level="medium">
-                            <span class="level-icon">🔥</span>
+                        <button class="level-btn" data-level="medium" aria-pressed="false">
+                            <span class="level-icon" aria-hidden="true">🔥</span>
                             <div class="level-info">
                                 <span class="level-name">MEDIUM</span>
                                 <span class="level-desc">4 Tiles</span>
                             </div>
                             <span class="level-multiplier">2x</span>
                         </button>
-                        <button class="level-btn" data-level="hard">
-                            <span class="level-icon">💀</span>
+                        <button class="level-btn" data-level="hard" aria-pressed="false">
+                            <span class="level-icon" aria-hidden="true">💀</span>
                             <div class="level-info">
                                 <span class="level-name">HARD</span>
                                 <span class="level-desc">5 Tiles</span>
@@ -120,7 +120,7 @@
 
             <div class="card glass-card">
                 <div class="card-header">
-                    <span class="card-icon">🏆</span>
+                    <span class="card-icon" aria-hidden="true">🏆</span>
                     <h2>Top Pilots</h2>
                 </div>
                 <div id="leaderboardPreview" class="leaderboard-list">
@@ -138,7 +138,7 @@
         <div class="container">
             <header class="game-header">
                 <div class="player-info">
-                    <div class="player-avatar">👽</div>
+                    <div class="player-avatar" aria-hidden="true">👽</div>
                     <div class="player-details">
                         <span class="player-name" id="currentTeamName">Crew</span>
                         <span class="player-level">
@@ -146,26 +146,26 @@
                         </span>
                     </div>
                 </div>
-                <button id="backToStartBtn" class="btn btn-icon">✕</button>
+                <button id="backToStartBtn" class="btn btn-icon" aria-label="Exit game">✕</button>
             </header>
 
             <div class="game-stats">
                 <div class="stat-box score-box">
-                    <div class="stat-icon">⛽</div>
+                    <div class="stat-icon" aria-hidden="true">⛽</div>
                     <div class="stat-content">
                         <span class="stat-value" id="currentScore">0</span>
                         <span class="stat-label">FUEL</span>
                     </div>
                 </div>
                 <div class="stat-box round-box">
-                    <div class="stat-icon">🛸</div>
+                    <div class="stat-icon" aria-hidden="true">🛸</div>
                     <div class="stat-content">
                         <span class="stat-value" id="roundNumber">0</span>
                         <span class="stat-label">SEQUENCE</span>
                     </div>
                 </div>
                 <div class="stat-box timer-box" id="timerBox" style="display: none;">
-                    <div class="stat-icon">⏱️</div>
+                    <div class="stat-icon" aria-hidden="true">⏱️</div>
                     <div class="stat-content">
                         <span class="stat-value" id="timerValue">60</span>
                         <span class="stat-label">SECONDS</span>
@@ -188,20 +188,20 @@
             </div>
 
             <div class="game-message-container">
-                <div class="message-icon" id="messageIcon">👽</div>
+                <div class="message-icon" id="messageIcon" aria-hidden="true">👽</div>
                 <div class="message-text" id="messageText">BoB needs your help! Press START to begin the launch
                     sequence!</div>
             </div>
 
             <div class="card glass-card game-arena">
-                <h3 class="arena-title"><span class="arena-icon">🛸</span> Launch Pad</h3>
+                <h3 class="arena-title"><span class="arena-icon" aria-hidden="true">🛸</span> Launch Pad</h3>
                 <div class="tile-grid" id="tileGrid">
                     <!-- Tiles generated by JS -->
                 </div>
             </div>
 
             <div class="card glass-card steps-card" id="stepsSection">
-                <h3 class="section-title"><span class="section-icon">👟</span> Your Sequence</h3>
+                <h3 class="section-title"><span class="section-icon" aria-hidden="true">👟</span> Your Sequence</h3>
                 <div class="sequence-grid" id="stepsGrid"></div>
             </div>
         </div>
@@ -238,7 +238,7 @@
         <div class="container">
             <div class="game-over-container">
                 <h1 class="game-over-title" id="gameOverTitle">
-                    <span class="title-icon">👽</span> MISSION FAILED
+                    <span class="title-icon" aria-hidden="true">👽</span> MISSION FAILED
                 </h1>
 
                 <div class="score-display">
@@ -252,12 +252,12 @@
 
                 <div class="final-stats">
                     <div class="final-stat">
-                        <span class="final-stat-icon">🛸</span>
+                        <span class="final-stat-icon" aria-hidden="true">🛸</span>
                         <span class="final-stat-value" id="finalRounds">0</span>
                         <span class="final-stat-label">Sequences</span>
                     </div>
                     <div class="final-stat">
-                        <span class="final-stat-icon">⚡</span>
+                        <span class="final-stat-icon" aria-hidden="true">⚡</span>
                         <span class="final-stat-value" id="finalLevel">Easy</span>
                         <span class="final-stat-label">Difficulty</span>
                     </div>
