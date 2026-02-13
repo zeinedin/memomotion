@@ -140,8 +140,12 @@ function setupEventListeners() {
   elements.modeBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
       if (btn.classList.contains('disabled')) return;
-      elements.modeBtns.forEach((b) => b.classList.remove('active'));
+      elements.modeBtns.forEach((b) => {
+        b.classList.remove('active');
+        b.setAttribute('aria-pressed', 'false');
+      });
       btn.classList.add('active');
+      btn.setAttribute('aria-pressed', 'true');
       gameState.mode = btn.dataset.mode;
     });
   });
@@ -149,8 +153,12 @@ function setupEventListeners() {
   // Level selection
   elements.levelBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
-      elements.levelBtns.forEach((b) => b.classList.remove('active'));
+      elements.levelBtns.forEach((b) => {
+        b.classList.remove('active');
+        b.setAttribute('aria-pressed', 'false');
+      });
       btn.classList.add('active');
+      btn.setAttribute('aria-pressed', 'true');
       gameState.level = btn.dataset.level;
     });
   });
@@ -170,6 +178,13 @@ function setupEventListeners() {
   // Enter key
   elements.teamNameInput?.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') startGame();
+  });
+
+  // Clear error on input
+  elements.teamNameInput?.addEventListener('input', () => {
+    elements.teamNameInput.setAttribute('aria-invalid', 'false');
+    elements.teamNameInput.style.borderColor = '';
+    if (elements.teamNameError) elements.teamNameError.style.display = 'none';
   });
 
   // Leaderboard filters
@@ -207,6 +222,9 @@ function showScreen(screen) {
     // Clear any error messages
     if (elements.teamNameError) {
       elements.teamNameError.style.display = 'none';
+    }
+    if (elements.teamNameInput) {
+      elements.teamNameInput.setAttribute('aria-invalid', 'false');
     }
   }
 }
@@ -903,9 +921,12 @@ function showError(msg) {
     elements.teamNameError.style.display = 'block';
   }
   if (elements.teamNameInput) {
+    elements.teamNameInput.setAttribute('aria-invalid', 'true');
     elements.teamNameInput.style.borderColor = 'var(--neon-red)';
     setTimeout(() => {
       elements.teamNameInput.style.borderColor = '';
+      // We keep aria-invalid=true until user corrects it or re-submits,
+      // but the visual cue fades. For better UX, we could reset it on input.
     }, 2000);
   }
 }
