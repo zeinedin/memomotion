@@ -51,29 +51,29 @@
 
                 <div class="form-group">
                     <label><span class="label-icon">🚀</span> Mission Type</label>
-                    <div class="mode-selector">
-                        <button class="mode-btn active" data-mode="classic">
+                    <div class="mode-selector" role="group" aria-label="Game Mode">
+                        <button class="mode-btn active" data-mode="classic" aria-pressed="true">
                             <span class="mode-icon">🛸</span>
                             <div class="mode-info">
                                 <span class="mode-name">CLASSIC</span>
                                 <span class="mode-desc">Standard launch sequence</span>
                             </div>
                         </button>
-                        <button class="mode-btn" data-mode="simon">
+                        <button class="mode-btn" data-mode="simon" aria-pressed="false">
                             <span class="mode-icon">🎯</span>
                             <div class="mode-info">
                                 <span class="mode-name">SIMON SAYS</span>
                                 <span class="mode-desc">Exact sequence</span>
                             </div>
                         </button>
-                        <button class="mode-btn disabled" data-mode="endless" disabled>
+                        <button class="mode-btn disabled" data-mode="endless" disabled aria-pressed="false">
                             <span class="mode-icon">♾️</span>
                             <div class="mode-info">
                                 <span class="mode-name">ENDLESS</span>
                                 <span class="mode-desc">Coming Soon</span>
                             </div>
                         </button>
-                        <button class="mode-btn" data-mode="speedrun">
+                        <button class="mode-btn" data-mode="speedrun" aria-pressed="false">
                             <span class="mode-icon">⚡</span>
                             <div class="mode-info">
                                 <span class="mode-name">EMERGENCY</span>
@@ -85,8 +85,8 @@
 
                 <div class="form-group">
                     <label><span class="label-icon">⚡</span> Difficulty</label>
-                    <div class="level-selector">
-                        <button class="level-btn active" data-level="easy">
+                    <div class="level-selector" role="group" aria-label="Difficulty Level">
+                        <button class="level-btn active" data-level="easy" aria-pressed="true">
                             <span class="level-icon">🌟</span>
                             <div class="level-info">
                                 <span class="level-name">EASY</span>
@@ -94,7 +94,7 @@
                             </div>
                             <span class="level-multiplier">1x</span>
                         </button>
-                        <button class="level-btn" data-level="medium">
+                        <button class="level-btn" data-level="medium" aria-pressed="false">
                             <span class="level-icon">🔥</span>
                             <div class="level-info">
                                 <span class="level-name">MEDIUM</span>
@@ -102,7 +102,7 @@
                             </div>
                             <span class="level-multiplier">2x</span>
                         </button>
-                        <button class="level-btn" data-level="hard">
+                        <button class="level-btn" data-level="hard" aria-pressed="false">
                             <span class="level-icon">💀</span>
                             <div class="level-info">
                                 <span class="level-name">HARD</span>
