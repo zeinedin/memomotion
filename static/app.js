@@ -140,8 +140,12 @@ function setupEventListeners() {
   elements.modeBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
       if (btn.classList.contains('disabled')) return;
-      elements.modeBtns.forEach((b) => b.classList.remove('active'));
+      elements.modeBtns.forEach((b) => {
+        b.classList.remove('active');
+        b.setAttribute('aria-pressed', 'false');
+      });
       btn.classList.add('active');
+      btn.setAttribute('aria-pressed', 'true');
       gameState.mode = btn.dataset.mode;
     });
   });
@@ -149,8 +153,12 @@ function setupEventListeners() {
   // Level selection
   elements.levelBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
-      elements.levelBtns.forEach((b) => b.classList.remove('active'));
+      elements.levelBtns.forEach((b) => {
+        b.classList.remove('active');
+        b.setAttribute('aria-pressed', 'false');
+      });
       btn.classList.add('active');
+      btn.setAttribute('aria-pressed', 'true');
       gameState.level = btn.dataset.level;
     });
   });
@@ -170,6 +178,17 @@ function setupEventListeners() {
   // Enter key
   elements.teamNameInput?.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') startGame();
+  });
+
+  // Input validation reset
+  elements.teamNameInput?.addEventListener('input', () => {
+    if (elements.teamNameInput.getAttribute('aria-invalid') === 'true') {
+      elements.teamNameInput.setAttribute('aria-invalid', 'false');
+      elements.teamNameInput.style.borderColor = '';
+      if (elements.teamNameError) {
+        elements.teamNameError.style.display = 'none';
+      }
+    }
   });
 
   // Leaderboard filters
@@ -903,10 +922,11 @@ function showError(msg) {
     elements.teamNameError.style.display = 'block';
   }
   if (elements.teamNameInput) {
+    elements.teamNameInput.setAttribute('aria-invalid', 'true');
     elements.teamNameInput.style.borderColor = 'var(--neon-red)';
-    setTimeout(() => {
-      elements.teamNameInput.style.borderColor = '';
-    }, 2000);
+    // Do not auto-clear border if we want persistent error state until input
+    // But original code cleared it. Let's keep it consistent with new aria-invalid logic
+    // We remove the timeout because we now clear on input
   }
 }
 
