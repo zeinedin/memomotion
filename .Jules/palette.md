@@ -1,0 +1,3 @@
+## 2024-05-18 - Form validation and disappearing errors
+**Learning:** Form validation errors should not disappear automatically via a timeout. They should persist until the user corrects the input. When clearing form errors, both the `aria-invalid` attribute and any inline styles must be explicitly reset to ensure the UI reflects the corrected state. Using `role="alert"` on the error message ensures screen readers announce the error immediately.
+**Action:** When implementing form validation, avoid timeouts for clearing errors. Always use event listeners (e.g., `input`) to clear errors dynamically when the user takes action to correct them. Explicitly manage `aria-invalid` and associated ARIA attributes.
