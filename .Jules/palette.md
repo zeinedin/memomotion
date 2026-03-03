@@ -1,0 +1,3 @@
+## 2024-05-18 - Form Validation State Persistence
+**Learning:** When clearing form errors in custom UI applications, both the `aria-invalid` attribute and any inline styles (like `style.borderColor`) must be reset explicitly. Relying on timeouts to clear inline styles creates a disjointed state where the border color resets but the error text remains, which is confusing for all users. It's better UX to persist the error visual state until the user actively corrects the input (e.g., via the `input` event).
+**Action:** When implementing form error handling, tie the error clearance (both visual and accessibility attributes) directly to user correction actions (like the `input` event) rather than arbitrary timeouts.
