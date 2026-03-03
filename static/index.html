@@ -44,7 +44,7 @@
                     </label>
                     <div class="input-wrapper">
                         <input type="text" id="teamName" placeholder="Enter your crew name..." maxlength="20"
-                            autocomplete="off">
+                            autocomplete="off" aria-describedby="teamNameError" aria-invalid="false">
                     </div>
                     <span id="teamNameError" class="input-error" style="display: none;"></span>
                 </div>
@@ -146,7 +146,7 @@
                         </span>
                     </div>
                 </div>
-                <button id="backToStartBtn" class="btn btn-icon">✕</button>
+                <button id="backToStartBtn" class="btn btn-icon" aria-label="Close game and return to start screen">✕</button>
             </header>
 
             <div class="game-stats">
