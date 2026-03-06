@@ -1,0 +1,3 @@
+## 2024-05-24 - Form validation error persistence
+**Learning:** Automatically hiding form validation errors via timeout (e.g. `setTimeout`) is bad UX because users might not read or comprehend the error fast enough. Furthermore, missing `aria-invalid` or `aria-describedby` makes it difficult for screen reader users to understand validation state.
+**Action:** Always persist form errors until the user corrects the input (e.g. clearing on `input` event). Use `aria-invalid="true"` to indicate invalid fields and `aria-describedby` to link the error message element to the input field.
