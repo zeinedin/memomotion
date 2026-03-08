@@ -1,0 +1,3 @@
+## 2024-05-18 - Form Validation Persistence and Accessibility
+**Learning:** Automatically dismissing form validation errors via timeout creates an accessibility and usability barrier, as users may miss the message before correcting the input. Furthermore, clearing visual error states (like border color) without also clearing associated ARIA states (like `aria-invalid`) leaves screen readers with incorrect context.
+**Action:** Always persist form validation errors until the user explicitly corrects the input (e.g., via `input` event). Ensure that both visual styles and ARIA attributes (`aria-invalid`) are cleared simultaneously.
