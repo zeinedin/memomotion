@@ -246,11 +246,18 @@ body {
 }
 
 /* Forms */
+fieldset.form-group {
+    border: none;
+    padding: 0;
+    min-width: 0;
+}
+
 .form-group {
     margin-bottom: 1.25rem;
 }
 
-.form-group label {
+.form-group label,
+.form-group legend {
     display: flex;
     align-items: center;
     gap: 0.5rem;
