@@ -1,0 +1,3 @@
+## 2024-05-18 - [Custom Button Groups]
+**Learning:** Frontend UI controls (like mode/level selectors) are implemented as custom button groups using `role="group"` rather than `role="radiogroup"`. This requires manual management of `aria-pressed` via JavaScript to indicate selection state while preserving native button tab navigation.
+**Action:** Always convert custom div/label wrappers for single-choice button groups to `fieldset`/`legend` with `role="group"` and manually toggle `aria-pressed` attributes. Ensure matching structural styling like `border: none; padding: 0; min-width: 0;` on the fieldset.
