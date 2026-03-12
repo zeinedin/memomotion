@@ -1,0 +1,3 @@
+## 2024-05-15 - Form Validation Persistence and Accessibility
+**Learning:** Automatically hiding form validation errors via timeout (e.g., after 2 seconds) results in poor UX and accessibility. Users may not have enough time to read the error or understand what went wrong before the feedback disappears. Furthermore, tying the visual error state to the `aria-invalid` attribute provides crucial context for screen reader users.
+**Action:** Always persist form validation errors until the user takes explicit action to correct the input (e.g., typing in the field). When setting an error state, use `setAttribute('aria-invalid', 'true')` and remove it (`removeAttribute('aria-invalid')`) when the error is cleared.
