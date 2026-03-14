@@ -1,0 +1,3 @@
+## 2024-05-24 - Form Validation Persistence and Inline Style Resetting
+**Learning:** In this project, automatic timeouts for form validation errors can lead to a confusing user experience because the error UI resets unexpectedly. When modifying `static/app.js` to clear errors on `input` events, both `aria-invalid` and inline styles (like `style.borderColor`) must be explicitly reset to ensure visual consistency with the initial non-error state.
+**Action:** When implementing form error handling, ensure errors persist until corrected by user input and reset both semantic attributes and inline styles simultaneously.
