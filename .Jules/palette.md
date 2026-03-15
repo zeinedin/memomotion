@@ -1,0 +1,3 @@
+## 2024-05-24 - Form Error Accessibility
+**Learning:** Automatically hiding form validation errors (like empty team name) with a timeout prevents screen reader users from reading and correcting the issue effectively, while missing `role="alert"` and `aria-errormessage` breaks semantic associations.
+**Action:** Always persist form validation errors in the DOM, associate them using `aria-invalid` and `aria-errormessage`, add `role="alert"`, and use an `input` event listener to clear the error explicitly only when the user corrects their input.
