@@ -1,0 +1,3 @@
+## 2026-03-16 - Form Error Accessibility and Timing
+**Learning:** Form validation errors tied to automatic timeouts (e.g. `setTimeout` to clear border colors) create poor accessibility experiences. Screen readers rely on `aria-invalid` attributes which must be explicitly synchronized with visual cues (like inline border styles). Furthermore, relying on timeouts means the visual error state can disappear before the user corrects the input, or conversely, remain even after they've fixed it.
+**Action:** Use the `input` event (triggered immediately as the user types) to simultaneously clear visual errors (e.g., inline `borderColor`) and accessibility flags (`aria-invalid="false"`), ensuring the UI accurately reflects the corrected state.
