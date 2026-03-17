@@ -1,0 +1,3 @@
+## 2024-05-24 - Managing ARIA-pressed states on custom button groups
+**Learning:** When using custom div structures (`<div role="group">`) containing buttons as mutually exclusive selection elements (like radio buttons), relying solely on an `active` class for visual styling leaves screen reader users completely unaware of the selection state. The `aria-pressed` attribute must be manually toggled via JavaScript on the individual buttons to announce their state.
+**Action:** When creating custom toggle buttons or mode selectors, always initialize `aria-pressed` based on the default state in HTML, and implement JavaScript handlers to toggle `aria-pressed="true"` on the selected button and `aria-pressed="false"` on all sibling buttons in the group.
