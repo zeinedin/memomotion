@@ -1,0 +1,3 @@
+## 2026-03-20 - Linked Form Validation Messages
+**Learning:** Using `aria-errormessage` connects an input explicitly to its error container, but the error container must have `role="alert"` for immediate screen reader announcements. Do not use `aria-live="polite"` with `role="alert"` to avoid conflicting announcements. Additionally, form validation errors should persist until user correction (e.g., cleared on `input` event) rather than disappearing via arbitrary timeouts (like `setTimeout`).
+**Action:** When creating form inputs with custom validation, use `aria-invalid="true"` paired with `aria-errormessage` and an alert role on the error container. Ensure the error state is cleared continuously via the `input` event.
