@@ -1,0 +1,3 @@
+## 2026-03-23 - Persisting Form Validation Feedback and ARIA Properties
+**Learning:** Automatically hiding inline form validation errors (like via `setTimeout` in `showError`) creates a poor user experience, especially for screen readers or those who need more time to process the feedback. Furthermore, managing only CSS properties (`style.borderColor`) leaves out crucial accessibility context.
+**Action:** Replace timeout-based validation clearing with event-driven clearing (e.g., `input` event). Manage accessibility attributes (like `aria-invalid` and `aria-errormessage`) dynamically in JavaScript alongside visual cues to ensure consistent state across all interaction types.
