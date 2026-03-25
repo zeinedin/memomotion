@@ -1,0 +1,3 @@
+## 2024-03-25 - Form Validation Persistence
+**Learning:** Form validation errors should persist until the user corrects the input rather than disappearing automatically via a timeout, as this creates a confusing UX where the user might forget the error state. Furthermore, when clearing form errors, both the `aria-invalid` attribute and any inline styles (like `borderColor`) must be reset explicitly alongside hiding the error message, preferably triggered by an `input` event to provide immediate feedback.
+**Action:** Always bind an `input` event listener to input fields to explicitly clear `aria-invalid`, inline styling (`borderColor`), and hide error containers. Remove arbitrary timeouts for error visibility.

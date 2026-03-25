@@ -1,0 +1,26 @@
+--- static/app.js
++++ static/app.js
+@@ -166,6 +166,13 @@
+   elements.teamNameInput?.addEventListener('keypress', (e) => {
+     if (e.key === 'Enter') startGame();
+   });
++  elements.teamNameInput?.addEventListener('input', () => {
++    elements.teamNameInput.style.borderColor = '';
++    elements.teamNameInput.setAttribute('aria-invalid', 'false');
++    if (elements.teamNameError) {
++      elements.teamNameError.style.display = 'none';
++    }
++  });
+
+   // Leaderboard filters
+   document.querySelectorAll('.filter-btn').forEach((btn) => {
+@@ -904,9 +911,7 @@
+   }
+   if (elements.teamNameInput) {
+     elements.teamNameInput.style.borderColor = 'var(--neon-red)';
+-    setTimeout(() => {
+-      elements.teamNameInput.style.borderColor = '';
+-    }, 2000);
++    elements.teamNameInput.setAttribute('aria-invalid', 'true');
+   }
+ }
