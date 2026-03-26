@@ -1,0 +1,3 @@
+## 2024-05-24 - Form Validation and Custom Selectors Accessibility
+**Learning:** Form validation errors need to persist until corrected and explicitly reset both `aria-invalid` attributes and inline styles to properly clear visually and semantically. Additionally, custom grouped controls like difficulty selectors require explicit `role="group"` on the container and manual JavaScript management of `aria-pressed` on active/inactive states to function accessibly for screen readers while maintaining visual style.
+**Action:** When creating custom form validation feedback, hook the clear logic directly into the `input` event and ensure explicit resets for both UI styles and ARIA states. Always manage `aria-pressed` for custom toggle-group components.
