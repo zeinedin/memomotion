@@ -1,0 +1,4 @@
+
+## 2024-03-20 - Form Validation Accessibility and UX
+**Learning:** Automatically hiding form validation errors on a timeout (like 2 seconds) creates a poor experience and fails accessibility standards. The user might miss the message, and screen readers may not read it in time. In addition, resetting invalid state only on a timeout causes issues when the user tries to fix the problem and is still given feedback that the form is invalid. When removing the timeout, resetting the `aria-invalid` attribute and inline styles on the `input` event immediately provides positive feedback to the user and resolves screen reader and visual focus conflicts.
+**Action:** Always link input fields to error containers using `aria-errormessage` and set `role="alert"` on the error container. Ensure validation errors persist until the user corrects the input (e.g., clear on `input` event) and explicitly reset `aria-invalid` along with inline styles.
