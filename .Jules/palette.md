@@ -1,0 +1,3 @@
+## 2024-05-24 - Persistent Form Validation & ARIA Coupling
+**Learning:** Automatically hiding form validation errors via timeout (e.g., 2 seconds) without requiring user interaction creates a poor UX because users might miss the error message or context before correcting the input. Furthermore, tying the `aria-invalid` attribute and `aria-errormessage` properly ensures screen readers announce errors persistently until the input is updated.
+**Action:** When implementing form validation, errors should persist until the user initiates correction (e.g., via the `input` event). The `aria-invalid="true"` state must be managed alongside visual indicators, and removed simultaneously.
