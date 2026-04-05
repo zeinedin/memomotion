@@ -1,0 +1,3 @@
+## 2024-05-24 - Form Error Announcements & Persistence
+**Learning:** For optimal screen reader announcements, `aria-errormessage` must be linked directly to the `role="alert"` element. Additionally, validation errors should persist visually (e.g., using `aria-invalid` and styling) until the user actively corrects them, rather than relying on an arbitrary time delay which can cause confusion.
+**Action:** Ensure all dynamic form errors use `aria-errormessage` properly, assign `role="alert"` on error containers, apply `aria-invalid="true"` persistently on error state, and clear the validation state explicitly on `input` events.
