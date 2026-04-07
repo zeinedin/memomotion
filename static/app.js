@@ -136,6 +136,17 @@ function cacheElements() {
 }
 
 function setupEventListeners() {
+  // Clear error on input
+  elements.teamNameInput?.addEventListener('input', () => {
+    if (elements.teamNameError) {
+      elements.teamNameError.style.display = 'none';
+    }
+    if (elements.teamNameInput) {
+      elements.teamNameInput.style.borderColor = '';
+      elements.teamNameInput.removeAttribute('aria-invalid');
+    }
+  });
+
   // Mode selection
   elements.modeBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -904,9 +915,7 @@ function showError(msg) {
   }
   if (elements.teamNameInput) {
     elements.teamNameInput.style.borderColor = 'var(--neon-red)';
-    setTimeout(() => {
-      elements.teamNameInput.style.borderColor = '';
-    }, 2000);
+    elements.teamNameInput.setAttribute('aria-invalid', 'true');
   }
 }
 
