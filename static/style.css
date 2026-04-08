@@ -49,6 +49,12 @@
     box-sizing: border-box;
 }
 
+/* Accessibility */
+*:focus-visible {
+    outline: 2px solid var(--neon-cyan);
+    outline-offset: 2px;
+}
+
 body {
     font-family: var(--font-body);
     background: var(--bg-dark);
