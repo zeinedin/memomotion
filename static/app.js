@@ -167,6 +167,17 @@ function setupEventListeners() {
   elements.playAgainBtn?.addEventListener('click', playAgain);
   elements.backToMenuBtn?.addEventListener('click', () => showScreen('start'));
 
+  // Input event to clear error state
+  elements.teamNameInput?.addEventListener('input', () => {
+    if (elements.teamNameError) {
+      elements.teamNameError.style.display = 'none';
+    }
+    if (elements.teamNameInput) {
+      elements.teamNameInput.style.borderColor = '';
+      elements.teamNameInput.removeAttribute('aria-invalid');
+    }
+  });
+
   // Enter key
   elements.teamNameInput?.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') startGame();
@@ -207,6 +218,10 @@ function showScreen(screen) {
     // Clear any error messages
     if (elements.teamNameError) {
       elements.teamNameError.style.display = 'none';
+    }
+    if (elements.teamNameInput) {
+      elements.teamNameInput.style.borderColor = '';
+      elements.teamNameInput.removeAttribute('aria-invalid');
     }
   }
 }
@@ -904,9 +919,7 @@ function showError(msg) {
   }
   if (elements.teamNameInput) {
     elements.teamNameInput.style.borderColor = 'var(--neon-red)';
-    setTimeout(() => {
-      elements.teamNameInput.style.borderColor = '';
-    }, 2000);
+    elements.teamNameInput.setAttribute('aria-invalid', 'true');
   }
 }
 
