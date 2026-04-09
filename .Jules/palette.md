@@ -1,0 +1,3 @@
+## 2024-05-18 - Form Error Accessibility
+**Learning:** For accessible form validation, error messages should not automatically disappear via timeout. They must persist until the user initiates correction (e.g., via the `input` event). Additionally, inputs must use `aria-invalid="true"` when in an error state, and link to their error container using `aria-errormessage="[id]"`, while the error container uses `role="alert"`.
+**Action:** When implementing or fixing form validation, remove automatic timeouts for clearing errors, bind error clearing logic to the `input` event on the specific field, and ensure ARIA linkage attributes (`aria-errormessage`, `aria-invalid`, `role="alert"`) are correctly applied.
