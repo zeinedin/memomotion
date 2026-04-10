@@ -1,0 +1,3 @@
+## 2026-04-10 - Form Validation UX & Accessibility
+**Learning:** Form validation errors disappearing after a timeout creates an accessibility and UX failure. Users often need time to read the error, and screen readers might not announce it properly or users might miss it if it vanishes. Additionally, errors need to be explicitly linked to inputs.
+**Action:** Always persist form validation errors until the user explicitly corrects the input (e.g., clear on the `input` event). Always use `aria-invalid` on the input and link it to the error container via `aria-errormessage`, with `role="alert"` on the container.
