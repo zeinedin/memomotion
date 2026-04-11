@@ -1,0 +1,3 @@
+## 2024-05-24 - Persisting Form Validation Errors
+**Learning:** Automatically hiding form validation errors via timeout (e.g., clearing after 2 seconds) causes frustration and cognitive load, as users might miss the context or forget the exact error while correcting the input. Furthermore, visually clearing errors is insufficient for screen readers.
+**Action:** Always persist form validation errors until the user corrects the input (e.g., clear on `input` event). Ensure errors are explicitly linked to their input fields using `aria-errormessage="[id]"` on the input and setting `role="alert"` on the error container to ensure accessibility.
