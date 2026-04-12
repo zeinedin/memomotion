@@ -172,6 +172,18 @@ function setupEventListeners() {
     if (e.key === 'Enter') startGame();
   });
 
+  // Clear errors on input
+  elements.teamNameInput?.addEventListener('input', () => {
+    if (elements.teamNameInput) {
+      elements.teamNameInput.style.borderColor = '';
+      elements.teamNameInput.removeAttribute('aria-invalid');
+    }
+    if (elements.teamNameError) {
+      elements.teamNameError.style.display = 'none';
+      elements.teamNameError.textContent = '';
+    }
+  });
+
   // Leaderboard filters
   document.querySelectorAll('.filter-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -207,6 +219,11 @@ function showScreen(screen) {
     // Clear any error messages
     if (elements.teamNameError) {
       elements.teamNameError.style.display = 'none';
+    }
+    if (elements.teamNameInput) {
+      elements.teamNameInput.style.borderColor = '';
+      elements.teamNameInput.removeAttribute('aria-invalid');
+      elements.teamNameInput.value = '';
     }
   }
 }
@@ -904,9 +921,7 @@ function showError(msg) {
   }
   if (elements.teamNameInput) {
     elements.teamNameInput.style.borderColor = 'var(--neon-red)';
-    setTimeout(() => {
-      elements.teamNameInput.style.borderColor = '';
-    }, 2000);
+    elements.teamNameInput.setAttribute('aria-invalid', 'true');
   }
 }
 
