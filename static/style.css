@@ -279,6 +279,17 @@ body {
     border-color: var(--neon-cyan);
 }
 
+.btn:focus-visible,
+.mode-btn:focus-visible,
+.level-btn:focus-visible,
+.filter-btn:focus-visible,
+.delete-btn:focus-visible,
+button:focus-visible,
+input:focus-visible {
+    outline: 2px solid var(--neon-cyan);
+    outline-offset: 2px;
+}
+
 .input-wrapper input::placeholder {
     color: var(--text-muted);
 }
