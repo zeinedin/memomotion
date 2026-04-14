@@ -1,0 +1,3 @@
+## 2026-04-14 - Form Validation Accessibility and UX
+**Learning:** Form validation errors that automatically clear on a timeout (e.g., 2000ms) can create a frustrating UX and violate accessibility guidelines by causing state to change unexpectedly before the user has a chance to correct their input or read the error via a screen reader. Tying the error clearing to the `input` event provides a much more intuitive and accessible experience.
+**Action:** Always persist form validation errors until the user explicitly corrects the input, and ensure ARIA attributes (`aria-invalid`, `aria-errormessage`, `role="alert"`) are dynamically updated in tandem with visual changes.
