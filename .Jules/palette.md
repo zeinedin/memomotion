@@ -1,0 +1,3 @@
+## 2024-05-15 - Form Validation Persistence
+**Learning:** Automatically hiding validation errors with timeouts causes confusion and prevents proper screen reader consumption. We must persist form validation error states (using `aria-errormessage` and `aria-invalid="true"`) until the user explicitly changes the input to attempt a correction.
+**Action:** Always link the input field to its error message container via `aria-errormessage` and `role="alert"`. Clear errors (and inline styling such as border colors) specifically on the `input` event so the UI updates as soon as the user starts typing the fix.
