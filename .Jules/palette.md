@@ -1,0 +1,3 @@
+## 2024-05-19 - Improved Keyboard Accessibility for Buttons
+**Learning:** Adding `:focus-visible` states to buttons instead of generic `:focus` is an effective way to improve keyboard accessibility without negatively impacting the experience of mouse users, who typically don't need or want a focus ring when clicking. Interactive elements, such as buttons acting as modes and levels in a game interface, benefit significantly from custom `focus-visible` styling using the site's existing neon design language to ensure they match visually. The `outline-offset` property creates comfortable spacing.
+**Action:** Always apply `focus-visible` styling with `outline` and `outline-offset` using matching design variables across the interactive selectors, like custom `btn` variations.
