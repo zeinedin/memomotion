@@ -1,0 +1,3 @@
+## 2024-05-24 - Interactive Form Validation Errors
+**Learning:** Arbitrary timeouts (e.g. `setTimeout` for 2 seconds) for form validation error states are a poor UX pattern because users read at different speeds and may miss the context of why their input was rejected. Furthermore, timeouts combined with accessibility states (like `aria-invalid="true"`) can create a disjointed experience where visual and semantic states drift out of sync if only the visual state clears on a timer.
+**Action:** Always prefer clearing form validation errors natively based on explicit user-driven events (like the `input` event on the specific field) to maintain a synchronous, predictable visual and screen reader experience.
