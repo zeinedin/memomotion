@@ -1,0 +1,3 @@
+## 2024-05-15 - Improve Form Validation Accessibility
+**Learning:** Automatically clearing validation errors using timeouts (e.g. `setTimeout`) can be frustrating for users and problematic for screen reader accessibility, as the error might disappear before the user has read it or had a chance to correct it.
+**Action:** Always make validation errors persist until the user interacts with the input (e.g. by typing to correct it). Link the input field to its error message container using `aria-errormessage="[id]"` and set `role="alert"` on the error container to ensure screen readers announce validation errors.
