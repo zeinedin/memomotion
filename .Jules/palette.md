@@ -1,0 +1,3 @@
+## 2024-05-03 - Form Validation Persistence & Accessible Errors
+**Learning:** Automatically hiding form validation errors via timeout (e.g., `setTimeout` for 2 seconds) creates a frustrating UX, as users may not finish reading or correcting the input in time. Additionally, visually hiding errors does not remove them from screen readers unless explicitly managed via ARIA attributes.
+**Action:** Always persist form validation errors until the user begins correcting the input (e.g., clear on the `input` event). Ensure errors are explicitly linked to inputs using `aria-errormessage` and their visibility state is mirrored with `aria-invalid`. Use `role="alert"` on error containers to announce them to assistive technologies.
