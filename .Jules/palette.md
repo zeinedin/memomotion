@@ -1,0 +1,1 @@
+## 2024-05-12 - Icon Button Tooltips\n**Learning:** Added aria-label and title to an icon-only close button for both screen reader accessibility and visual tooltips.\n**Action:** When adding aria-labels to purely icon-based interactive elements, consider also adding a title attribute to provide an immediate hover tooltip for sighted users.
