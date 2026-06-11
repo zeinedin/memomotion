@@ -1181,3 +1181,10 @@ body {
         gap: var(--space-lg);
     }
 }
+/* Keyboard Accessibility */
+button:focus-visible,
+input:focus-visible,
+a:focus-visible {
+    outline: 2px solid var(--neon-cyan);
+    outline-offset: 2px;
+}
