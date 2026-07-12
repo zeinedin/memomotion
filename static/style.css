@@ -1181,3 +1181,12 @@ body {
         gap: var(--space-lg);
     }
 }
+button:focus-visible,
+input:focus-visible,
+a:focus-visible,
+.filter-btn:focus-visible,
+.mode-btn:focus-visible,
+.level-btn:focus-visible {
+    outline: 2px solid var(--neon-cyan);
+    outline-offset: 2px;
+}
