@@ -444,6 +444,11 @@ body {
     box-shadow: 0 0 25px rgba(255, 0, 68, 0.5);
 }
 
+button:focus-visible {
+    outline: 2px solid var(--neon-cyan);
+    outline-offset: 2px;
+}
+
 .btn-icon {
     width: 40px;
     height: 40px;
