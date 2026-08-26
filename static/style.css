@@ -376,6 +376,11 @@ body {
 }
 
 /* Buttons */
+.btn:focus-visible, .mode-btn:focus-visible, .level-btn:focus-visible, .filter-btn:focus-visible {
+    outline: 2px solid var(--neon-cyan);
+    outline-offset: 2px;
+}
+
 .btn {
     display: inline-flex;
     align-items: center;
