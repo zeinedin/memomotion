@@ -279,6 +279,11 @@ body {
     border-color: var(--neon-cyan);
 }
 
+.input-wrapper input:focus-visible {
+    outline: 2px solid var(--neon-cyan);
+    outline-offset: 2px;
+}
+
 .input-wrapper input::placeholder {
     color: var(--text-muted);
 }
@@ -390,6 +395,11 @@ body {
     border-radius: var(--radius-md);
     cursor: pointer;
     transition: all 0.2s;
+}
+
+.btn:focus-visible {
+    outline: 2px solid var(--neon-cyan);
+    outline-offset: 2px;
 }
 
 .btn-play {
