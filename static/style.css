@@ -392,6 +392,11 @@ body {
     transition: all 0.2s;
 }
 
+.btn:focus-visible {
+    outline: 2px solid var(--neon-cyan);
+    outline-offset: 2px;
+}
+
 .btn-play {
     width: 100%;
     padding: 1rem;
