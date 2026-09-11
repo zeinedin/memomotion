@@ -823,6 +823,8 @@
                     var deleteBtn = document.createElement('button');
                     deleteBtn.className = 'delete-btn';
                     deleteBtn.textContent = '🗑️';
+                    deleteBtn.setAttribute('aria-label', 'Delete score for ' + entry.team_name);
+                    deleteBtn.title = 'Delete score';
                     deleteBtn.setAttribute('data-id', entry.id || String(i));
                     deleteBtn.setAttribute('data-name', entry.team_name);
                     deleteBtn.addEventListener('click', handleDeleteClick);
