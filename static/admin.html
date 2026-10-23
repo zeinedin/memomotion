@@ -825,6 +825,8 @@
                     deleteBtn.textContent = '🗑️';
                     deleteBtn.setAttribute('data-id', entry.id || String(i));
                     deleteBtn.setAttribute('data-name', entry.team_name);
+                    deleteBtn.setAttribute('aria-label', 'Delete score for ' + entry.team_name);
+                    deleteBtn.setAttribute('title', 'Delete score for ' + entry.team_name);
                     deleteBtn.addEventListener('click', handleDeleteClick);
                     tdAction.appendChild(deleteBtn);
                     tr.appendChild(tdAction);
