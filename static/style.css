@@ -1181,3 +1181,8 @@ body {
         gap: var(--space-lg);
     }
 }
+/* Accessibility - Keyboard navigation */
+:focus-visible {
+    outline: 2px solid var(--neon-cyan) !important;
+    outline-offset: 3px !important;
+}
