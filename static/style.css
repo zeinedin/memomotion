@@ -1181,3 +1181,16 @@ body {
         gap: var(--space-lg);
     }
 }
+/* Accessibility: Keyboard Focus Styles */
+.btn:focus-visible,
+.btn-icon:focus-visible,
+.mode-btn:focus-visible,
+.level-btn:focus-visible,
+.filter-btn:focus-visible,
+.danger-btn:focus-visible,
+.refresh-btn:focus-visible,
+.save-btn:focus-visible,
+.delete-btn:focus-visible {
+    outline: 2px solid var(--neon-cyan);
+    outline-offset: 2px;
+}
